@@ -67,11 +67,19 @@ Puoi anche lanciarlo a mano da `Actions → Release → Run workflow`.
 Incolla questo URL in `Add-on Modules → Install Module → Manifest URL`:
 
 ```
-https://github.com/TUO-USER/foundryWar/releases/latest/download/module.json
+https://github.com/TechAle/foundryWar/releases/latest/download/module.json
 ```
 
-Sostituisci `TUO-USER/foundryWar` con il tuo utente e repo.
 Questo URL punta sempre all'ultima release, quindi gli aggiornamenti arrivano da soli.
+
+> ⚠️ **Non usare l'URL della pagina GitHub** (`https://github.com/TechAle/foundryWar/blob/main/module.json`).
+> Quello restituisce HTML, non JSON, e Foundry dà `error parsing ... unexpected token '<'`.
+>
+> URL corretti:
+> - installazione/aggiornamento → `https://github.com/TechAle/foundryWar/releases/latest/download/module.json`
+> - file raw del branch (solo per debug) → `https://raw.githubusercontent.com/TechAle/foundryWar/main/module.json`
+>
+> Se `releases/latest/download/module.json` dà 404, significa che non hai ancora pubblicato una release: crea un tag `v0.1.0` e pushalo.
 
 ## 4. Personalizzare
 
