@@ -1,0 +1,68 @@
+name: Release
+
+# Si attiva quando pushi un tag tipo v0.1.0, oppure manualmente dalla tab Actions.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versione da pubblicare (es. 0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Calcola versione
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Aggiorna module.json con URL e versione reali
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          node - <<'EOF'
+          const fs = require("fs");
+          const file = "module.json";
+          const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+          const repo = process.env.REPO;
+          const version = process.env.VERSION;
+
+          manifest.version = version;
+          manifest.url = `https://github.com/${repo}`;
+          manifest.bugs = `https://github.com/${repo}/issues`;
+          manifest.changelog = `https://github.com/${repo}/releases`;
+          manifest.manifest = `https://github.com/${repo}/releases/download/v${version}/module.json`;
+          manifest.download = `https://github.com/${repo}/releases/download/v${version}/module.zip`;
+
+          fs.writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n");
+          EOF
+
+      - name: Crea module.zip
+        run: |
+          zip -r module.zip module.json scripts styles lang README.md LICENSE -x "*.DS_Store"
+
+      - name: Pubblica la release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.vars.outputs.version }}
+          name: v${{ steps.vars.outputs.version }}
+          generate_release_notes: true
+          files: |
+            module.json
+            module.zip
