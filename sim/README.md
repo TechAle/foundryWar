@@ -25,11 +25,11 @@ Non richiede Foundry né dipendenze npm.
 ## Uso
 
 ```bash
-# report demo con 4 scenari (60%, 100%, 160%, 300%)
+# apre il report interattivo con i valori di default
 node sim/run.mjs
 
-# scenario singolo
-node sim/run.mjs --ally "1x10,3x2" --enemy "2x8" --runs 20000
+# valori iniziali personalizzati
+node sim/run.mjs --ally "1x10" --enemy "2x8" --runs 20000
 
 # rush e soglia schiacciante
 node sim/run.mjs --ally "1x30" --enemy "1x10" --rush true --threshold 0.95
@@ -38,31 +38,43 @@ node sim/run.mjs --ally "1x30" --enemy "1x10" --rush true --threshold 0.95
 node sim/run.mjs --ally "1x16" --enemy "1x10" --alpha 0.5 --lossCap 0.4
 ```
 
-Sintassi unità: `CRxTRUPPE`, separati da virgola. Esempio: `1x10,3x2` =
-10 truppe CR 1 + 2 truppe CR 3.
+Sintassi unità: `CRxTRUPPE`. Esempio: `1x10` = 10 truppe CR 1.
+Il report interattivo usa **un battaglione per lato**: se passi più voci,
+viene usata la prima.
 
 Opzioni:
 
 | Opzione | Default | Descrizione |
 | --- | --- | --- |
-| `--ally` / `--enemy` | scenari demo | composizione dei due lati |
-| `--runs` | `20000` | battaglie simulate per scenario |
-| `--alpha` | `0.3` | caos (0–1) |
-| `--rush` | `false` | perdite illimitate |
+| `--ally` / `--enemy` | `1x10` | valori iniziali degli slider |
+| `--runs` | `20000` | battaglie simulate (console); nel report max 8000 |
+| `--alpha` | `0.3` | caos iniziale (0–1) |
+| `--rush` | `false` | perdite illimitate iniziali |
 | `--lossCap` | `0.5` | limite perdite senza rush |
 | `--threshold` | `0.95` | soglia vittoria schiacciante |
 | `--dice` | `3` | truppe schierate per round |
 | `--seed` | `12345` | seed del RNG |
 | `--out` | `sim/out/report.html` | report HTML |
 
-## Output
+## Report interattivo
 
-- Riepilogo in console (vittorie, perdite medie, schiacciante).
-- `sim/out/report.html`: grafico interattivo con una curva per scenario.
-  - asse X: truppe alleate rimaste − truppe nemiche rimaste
-  - asse Y: probabilità
-  - hover: probabilità, perdite medie e truppe medie in quel caso
-- `sim/out/report.json`: gli stessi dati in JSON.
+In `sim/out/report.html`:
+
+- **slider** per truppe alleate e nemiche (1–200)
+- **slider** per il CR dei due lati (0–20)
+- **slider** per alpha
+- **checkbox** Rush
+- il grafico si ricalcola in tempo reale (debounce ~90 ms)
+
+Il grafico ha due assi:
+
+- **sinistro**: probabilità dell'esito (curva azzurra, area)
+- **destro**: perdite medie (linea verde = alleati, linea rossa = nemici)
+- **asse X**: truppe alleate rimaste − truppe nemiche rimaste
+
+Hover: probabilità, perdite medie e truppe medie in quel preciso esito.
+
+Il file `sim/out/report.json` contiene i valori iniziali e la distribuzione.
 
 Il report si apre nel browser:
 

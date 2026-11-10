@@ -175,7 +175,7 @@ Il motore puro è in `scripts/battle-engine.js` (usabile anche da Foundry),
 il runner CLI in `sim/run.mjs`.
 
 ```bash
-# report demo con 4 scenari (curva che si sposta)
+# report interattivo con slider per truppe e CR
 node sim/run.mjs
 
 # scenario singolo: 10 truppe CR 1 + 2 CR 3 contro 8 truppe CR 2
