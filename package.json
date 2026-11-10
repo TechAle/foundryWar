@@ -1,0 +1,11 @@
+{
+  "name": "foundry-war",
+  "version": "0.1.0",
+  "description": "Foundry VTT v13 module scaffold",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node tools/validate.mjs",
+    "zip": "rm -f module.zip && zip -r module.zip module.json scripts styles lang README.md LICENSE -x '*.DS_Store'"
+  }
+}

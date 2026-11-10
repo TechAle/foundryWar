@@ -1,0 +1,17 @@
+{
+  "FOUNDRY-WAR": {
+    "settings": {
+      "enabled": {
+        "name": "Enable Foundry War",
+        "hint": "Enable the features provided by this module."
+      }
+    },
+    "notifications": {
+      "ready": "Foundry War loaded. Type /war in chat.",
+      "pong": "Foundry War is working!"
+    },
+    "chat": {
+      "flavor": "Foundry War!"
+    }
+  }
+}
