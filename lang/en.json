@@ -1,17 +1,41 @@
 {
   "FOUNDRY-WAR": {
+    "header": {
+      "war": "War"
+    },
     "settings": {
       "enabled": {
         "name": "Enable Foundry War",
         "hint": "Enable the features provided by this module."
+      },
+      "troopTypes": {
+        "name": "Troop types",
+        "hint": "Comma-separated list of troop types shown in the War dialog, e.g. Infantry, Cavalry, Archers."
       }
     },
-    "notifications": {
-      "ready": "Foundry War loaded. Type /war in chat.",
-      "pong": "Foundry War is working!"
+    "dialog": {
+      "title": "War configuration: {name}",
+      "team": {
+        "name": "Team",
+        "ally": "Ally",
+        "enemy": "Enemy"
+      },
+      "troopType": {
+        "name": "Troop type",
+        "hint": "Troop types can be edited in the module settings.",
+        "none": "— None —"
+      },
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "War configuration saved for {name}."
     },
-    "chat": {
-      "flavor": "Foundry War!"
+    "warnings": {
+      "noActor": "Select a token or open an actor sheet first.",
+      "noPermission": "You do not have permission to configure this actor."
+    },
+    "notifications": {
+      "ready": "Foundry War loaded. Open an actor's ⋯ menu and choose War.",
+      "pong": "Foundry War is working!"
     }
   }
 }

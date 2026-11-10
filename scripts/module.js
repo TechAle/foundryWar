@@ -2,8 +2,14 @@
  * Foundry War - modulo di esempio per Foundry VTT v13 (build 351).
  *
  * Questo file viene caricato come ES module (vedi "esmodules" in module.json).
- * Qui puoi agganciarti agli hook di Foundry per aggiungere le tue funzioni.
+ * La configurazione "War" delle schede Attore è in scripts/war-config.js.
  */
+
+import {
+  getWarData,
+  openWarConfig,
+  setWarData,
+} from "./war-config.js";
 
 const MODULE_ID = "foundry-war";
 
@@ -21,6 +27,15 @@ Hooks.once("init", () => {
     type: Boolean,
     default: true,
   });
+
+  game.settings.register(MODULE_ID, "troopTypes", {
+    name: "FOUNDRY-WAR.settings.troopTypes.name",
+    hint: "FOUNDRY-WAR.settings.troopTypes.hint",
+    scope: "world",
+    config: true,
+    type: String,
+    default: "Fanteria, Cavalleria, Arcieri, Artiglieria, Mostro, Comandante",
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -30,10 +45,14 @@ Hooks.once("ready", () => {
   console.log(`${MODULE_ID} | ready`);
 
   // API pubblica del modulo, richiamabile da macro:
-  //   game.foundryWar.ping()
+  //   game.foundryWar.openConfig(actor)
+  //   game.foundryWar.getWarData(actor)
   game.foundryWar = {
     version: game.modules.get(MODULE_ID)?.version ?? "dev",
     ping: () => ui.notifications.info(game.i18n.localize("FOUNDRY-WAR.notifications.pong")),
+    openConfig: openWarConfig,
+    getWarData,
+    setWarData,
   };
 
   if (!game.settings.get(MODULE_ID, "enabled")) return;
@@ -42,16 +61,15 @@ Hooks.once("ready", () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Esempio: comando chat "/war" che tira 1d20.                                */
-/* Restituire false blocca il messaggio originale in chat.                    */
+/* Comando chat "/war": apre la configurazione per il token selezionato.      */
 /* -------------------------------------------------------------------------- */
 Hooks.on("chatMessage", (_chatLog, message) => {
   if (message.trim() !== "/war") return true;
   if (!game.settings.get(MODULE_ID, "enabled")) return true;
 
-  new Roll("1d20").toMessage({
-    flavor: game.i18n.localize("FOUNDRY-WAR.chat.flavor"),
-  });
+  const actor =
+    canvas.tokens?.controlled?.[0]?.actor ?? game.user.character ?? null;
 
+  openWarConfig(actor);
   return false;
 });

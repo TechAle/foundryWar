@@ -5,6 +5,21 @@ Modulo di esempio per **Foundry VTT v13 (verificato su 13.351)**.
 Serve come base minima e funzionante: manifest, codice ES module, stili,
 localizzazione e release automatica su GitHub.
 
+## Cosa fa
+
+- Aggiunge **Guerra** al menu `⋯` di ogni scheda Attore (PG e PNG).
+- Il dialog di configurazione permette di scegliere:
+  - **Squadra**: Alleato / Nemico
+  - **Tipo di truppa**: lista configurabile dalle impostazioni del modulo
+- I dati sono salvati nei flag dell'attore:
+  `actor.flags["foundry-war"].war = { team, troopType }`
+- La lista predefinita è `Fanteria, Cavalleria, Arcieri, Artiglieria, Mostro, Comandante`
+  e si modifica in `Configurazioni → Impostazioni modulo → Tipi di truppa`.
+- Comando chat `/war`: apre la configurazione per il token selezionato
+  (o per il personaggio associato all'utente).
+- API per macro: `game.foundryWar.getWarData(actor)`,
+  `game.foundryWar.setWarData(actor, data)`, `game.foundryWar.openConfig(actor)`.
+
 ---
 
 ## 1. Requisiti
@@ -37,7 +52,8 @@ Poi:
 1. Avvia Foundry, crea/apri un mondo.
 2. `Configurazioni → Gestisci moduli` e attiva **Foundry War**.
 3. Ricarica con `F5` dopo ogni modifica.
-4. In chat scrivi `/war` per il test, oppure da console: `game.foundryWar.ping()`.
+4. Apri la scheda di un attore, clicca `⋯` in alto a destra e scegli **Guerra**.
+5. Da console puoi verificare con `game.foundryWar.ping()`, oppure in chat `/war` con un token selezionato.
 
 > Il nome della cartella dentro `Data/modules` **deve** essere uguale a `id` in `module.json`.
 

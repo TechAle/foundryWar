@@ -1,4 +1,14 @@
-/* Stili del modulo. Le classi qui sotto sono solo un esempio. */
+/* Stili del modulo. */
+
+.foundry-war-config .form-group {
+  margin-bottom: 0.75rem;
+}
+
+.foundry-war-config .hint {
+  margin-top: 0.25rem;
+  font-size: var(--font-size-12, 0.75rem);
+  opacity: 0.8;
+}
 
 .foundry-war-highlight {
   color: #ff6400;

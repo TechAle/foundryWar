@@ -1,17 +1,41 @@
 {
   "FOUNDRY-WAR": {
+    "header": {
+      "war": "Guerra"
+    },
     "settings": {
       "enabled": {
         "name": "Abilita Foundry War",
         "hint": "Attiva le funzioni fornite da questo modulo."
+      },
+      "troopTypes": {
+        "name": "Tipi di truppa",
+        "hint": "Elenco separato da virgole dei tipi di truppa mostrati nel dialog Guerra, es. Fanteria, Cavalleria, Arcieri."
       }
     },
-    "notifications": {
-      "ready": "Foundry War caricato. Scrivi /war in chat.",
-      "pong": "Foundry War funziona!"
+    "dialog": {
+      "title": "Configurazione guerra: {name}",
+      "team": {
+        "name": "Squadra",
+        "ally": "Alleato",
+        "enemy": "Nemico"
+      },
+      "troopType": {
+        "name": "Tipo di truppa",
+        "hint": "I tipi di truppa si modificano dalle impostazioni del modulo.",
+        "none": "— Nessuno —"
+      },
+      "save": "Salva",
+      "cancel": "Annulla",
+      "saved": "Configurazione guerra salvata per {name}."
     },
-    "chat": {
-      "flavor": "Foundry War!"
+    "warnings": {
+      "noActor": "Seleziona un token o apri la scheda di un attore.",
+      "noPermission": "Non hai i permessi per configurare questo attore."
+    },
+    "notifications": {
+      "ready": "Foundry War caricato. Apri il menu ⋯ di un attore e scegli Guerra.",
+      "pong": "Foundry War funziona!"
     }
   }
 }
