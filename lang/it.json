@@ -42,6 +42,8 @@
       "enemies": "Nemici",
       "empty": "Nessuna unità",
       "cr": "Challenge Rating",
+      "crDecrease": "Diminuisci CR",
+      "crIncrease": "Aumenta CR",
       "hp": "Punti ferita",
       "type": "Tipo",
       "remove": "Rimuovi dal pannello",
@@ -52,7 +54,6 @@
       "ranged": "Attacco a distanza (+2 CR)"
     },
     "simulate": {
-      "chat": "Trasforma il CR di tutti quanti in esperienza",
       "allies": "Esperienza alleati: {xp} XP",
       "enemies": "Esperienza nemici: {xp} XP"
     },

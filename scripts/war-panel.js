@@ -228,7 +228,7 @@ async function resolveEntries() {
         team: war.team === "enemy" ? "enemy" : "ally",
         troopType,
         kind,
-        cr: getCR(actor),
+        cr: Number.isFinite(entry.cr) ? entry.cr : getCR(actor),
         hp: getHP(actor),
         effects: {
           inspiration: effects.inspiration ?? true,
@@ -316,8 +316,16 @@ function renderCard(entry, escapeHTML) {
           </button>
         </header>
         <div class="fw-stats">
-          <span class="fw-stat" data-tooltip="${game.i18n.localize("FOUNDRY-WAR.panel.cr")}">
-            <b>CR</b> ${formatCR(entry.cr)}${bonus}
+          <span class="fw-stat fw-cr" data-tooltip="${game.i18n.localize("FOUNDRY-WAR.panel.cr")}">
+            <b>CR</b>
+            <span class="fw-cr-control">
+              <button type="button" class="fw-cr-btn" data-action="adjustCR" data-entry-id="${entry.id}" data-delta="-1"
+                      data-tooltip="${game.i18n.localize("FOUNDRY-WAR.panel.crDecrease")}">−</button>
+              <span class="fw-cr-value">${formatCR(entry.cr)}</span>
+              <button type="button" class="fw-cr-btn" data-action="adjustCR" data-entry-id="${entry.id}" data-delta="1"
+                      data-tooltip="${game.i18n.localize("FOUNDRY-WAR.panel.crIncrease")}">+</button>
+            </span>
+            ${bonus}
           </span>
           <span class="fw-stat" data-tooltip="${game.i18n.localize("FOUNDRY-WAR.panel.hp")}">
             <b>HP</b> ${renderHP(entry.hp)}
@@ -396,6 +404,7 @@ export class WarPanel extends ApplicationV2 {
       simulateWar: WarPanel.onSimulateWar,
       removeEntry: WarPanel.onRemoveEntry,
       toggleEffect: WarPanel.onToggleEffect,
+      adjustCR: WarPanel.onAdjustCR,
     },
   };
 
@@ -440,6 +449,29 @@ export class WarPanel extends ApplicationV2 {
     });
   }
 
+  static async onAdjustCR(_event, target) {
+    const entryId = target.dataset.entryId;
+    const delta = Number(target.dataset.delta) || 0;
+    if (!entryId || !delta) return;
+
+    const state = getWarState();
+    const entry = state.entries[entryId];
+    if (!entry) return;
+
+    let base = Number.isFinite(entry.cr) ? entry.cr : null;
+    if (base == null) {
+      const tokenDoc = await safeFromUuid(entry.tokenUuid);
+      const actor = tokenDoc?.actor ?? (await safeFromUuid(entry.actorUuid));
+      base = getCR(actor);
+    }
+
+    const cr = Math.max(0, Math.round((base + delta) * 1000) / 1000);
+
+    await commitWarState({
+      entries: { ...state.entries, [entryId]: { ...entry, cr } },
+    });
+  }
+
   static async onSimulateWar() {
     const entries = await resolveEntries();
     const sum = (team) =>
@@ -447,10 +479,6 @@ export class WarPanel extends ApplicationV2 {
 
     const allies = sum("ally");
     const enemies = sum("enemy");
-
-    await ChatMessage.create({
-      content: `<p>${game.i18n.localize("FOUNDRY-WAR.simulate.chat")}</p>`,
-    });
 
     ui.notifications.info(
       game.i18n.format("FOUNDRY-WAR.simulate.allies", { xp: allies.toLocaleString() }),

@@ -203,6 +203,41 @@
   font-weight: 700;
 }
 
+.fw-cr-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-left: 0.15rem;
+  vertical-align: middle;
+}
+
+.fw-cr-btn {
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.fw-cr-btn:hover {
+  color: #f0c674;
+  border-color: #f0c674;
+}
+
+.fw-cr-value {
+  min-width: 1.2rem;
+  text-align: center;
+  font-weight: 700;
+}
+
 .fw-effects {
   margin-top: 0.35rem;
   display: flex;

@@ -29,12 +29,15 @@ localizzazione e release automatica su GitHub.
   l'operazione vale per tutta la selezione.
 - Il pannello è diviso in **Alleati** (sinistra) e **Nemici** (destra) e mostra
   per ogni unità token, CR, HP e tipo di truppa.
+- Il **CR è modificabile a mano** con i pulsanti `−` / `+` su ogni card
+  (parte dal CR dell'attore, minimo 0). Il valore manuale resta solo nel
+  pannello e non tocca la scheda.
 - Effetti per tipo (calcolati **solo** nel pannello, mai scritti sulla scheda):
   - **Comandante** → *Ispirazione da guerra*: +1 CR a tutte le unità dello
     stesso schieramento (attivo di default).
   - **Arciere** → *Attacco a distanza*: +2 CR a se stesso (attivo di default).
-- **Simula guerra**: scrive in chat "Trasforma il CR di tutti quanti in
-  esperienza" e mostra due notifiche con gli XP totali di alleati e nemici.
+- **Simula guerra**: mostra due notifiche con gli XP totali di alleati e
+  nemici (non scrive nulla in chat).
 - Lo stato è una **world setting**, quindi condiviso in tempo reale tra tutti i
   client. I giocatori senza permessi di modifica passano la richiesta al GM via
   socket; il GM applica la modifica per tutti.

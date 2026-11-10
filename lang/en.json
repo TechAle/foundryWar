@@ -42,6 +42,8 @@
       "enemies": "Enemies",
       "empty": "No units",
       "cr": "Challenge Rating",
+      "crDecrease": "Decrease CR",
+      "crIncrease": "Increase CR",
       "hp": "Hit Points",
       "type": "Type",
       "remove": "Remove from panel",
@@ -52,7 +54,6 @@
       "ranged": "Ranged attack (+2 CR)"
     },
     "simulate": {
-      "chat": "Convert everyone's CR into experience",
       "allies": "Allies experience: {xp} XP",
       "enemies": "Enemies experience: {xp} XP"
     },
