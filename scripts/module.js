@@ -47,6 +47,17 @@ Hooks.once("init", () => {
     default: "Fanteria, Cavalleria, Arcieri, Artiglieria, Mostro, Comandante",
   });
 
+  // Bilanciamento della futura simulazione: 0 = deterministico, 1 = caso puro.
+  game.settings.register(MODULE_ID, "battleBalance", {
+    name: "FOUNDRY-WAR.settings.battleBalance.name",
+    hint: "FOUNDRY-WAR.settings.battleBalance.hint",
+    scope: "world",
+    config: true,
+    type: Number,
+    default: 0.3,
+    range: { min: 0, max: 1, step: 0.05 },
+  });
+
   // Stato del pannello: world setting = condivisa con tutti i client.
   game.settings.register(MODULE_ID, STATE_KEY, {
     scope: "world",

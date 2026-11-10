@@ -36,8 +36,16 @@ localizzazione e release automatica su GitHub.
   - **Comandante** → *Ispirazione da guerra*: +1 CR a tutte le unità dello
     stesso schieramento (attivo di default).
   - **Arciere** → *Attacco a distanza*: +2 CR a se stesso (attivo di default).
+- **Flank / Accerchia** (uno per schieramento): bonus globale di +1 CR / +2 CR
+  a tutte le unità di quel lato. Sono mutuamente esclusivi e si disattivano
+  ricliccando.
+- **Rush** (toggle globale): senza Rush le perdite future saranno limitate al
+  50% delle truppe; con Rush si applicheranno le perdite massime.
 - **Simula guerra**: mostra due notifiche con gli XP totali di alleati e
   nemici (non scrive nulla in chat).
+- XP: minimo **50**, arrotondato per difetto.
+- Il bilanciamento del futuro combattimento è una setting del GM,
+  **default 0.3** (`0` = deterministico, `1` = caso puro).
 - Lo stato è una **world setting**, quindi condiviso in tempo reale tra tutti i
   client. I giocatori senza permessi di modifica passano la richiesta al GM via
   socket; il GM applica la modifica per tutti.

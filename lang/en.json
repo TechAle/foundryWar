@@ -18,6 +18,10 @@
       "troopTypes": {
         "name": "Troop types",
         "hint": "Comma-separated list of troop types shown in the War dialog, e.g. Infantry, Cavalry, Archers."
+      },
+      "battleBalance": {
+        "name": "Combat balance",
+        "hint": "0 = deterministic outcome, 1 = pure chance. Lower values reduce extreme results (Balanced Blitz style)."
       }
     },
     "dialog": {
@@ -47,7 +51,11 @@
       "hp": "Hit Points",
       "type": "Type",
       "remove": "Remove from panel",
-      "simulate": "Simulate war"
+      "simulate": "Simulate war",
+      "flank": "Flank (+1 CR)",
+      "encircle": "Encircle (+2 CR)",
+      "rush": "Rush",
+      "rushHint": "Without Rush losses are capped at 50% of troops. With Rush maximum losses apply."
     },
     "effects": {
       "inspiration": "War inspiration (+1 CR)",

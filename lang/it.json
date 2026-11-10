@@ -18,6 +18,10 @@
       "troopTypes": {
         "name": "Tipi di truppa",
         "hint": "Elenco separato da virgole dei tipi di truppa mostrati nel dialog Guerra, es. Fanteria, Cavalleria, Arcieri."
+      },
+      "battleBalance": {
+        "name": "Bilanciamento combattimento",
+        "hint": "0 = risultato deterministico, 1 = caso puro. Valori bassi riducono gli esiti estremi (stile Balanced Blitz)."
       }
     },
     "dialog": {
@@ -47,7 +51,11 @@
       "hp": "Punti ferita",
       "type": "Tipo",
       "remove": "Rimuovi dal pannello",
-      "simulate": "Simula guerra"
+      "simulate": "Simula guerra",
+      "flank": "Flank (+1 CR)",
+      "encircle": "Accerchia (+2 CR)",
+      "rush": "Rush",
+      "rushHint": "Senza Rush le perdite sono limitate al 50% delle truppe. Con Rush si applicano le perdite massime."
     },
     "effects": {
       "inspiration": "Ispirazione da guerra (+1 CR)",

@@ -11,13 +11,28 @@
 const MODULE_ID = "foundry-war";
 const STATE_KEY = "warState";
 
+// XP minimo e arrotondamento per difetto.
+const MIN_XP = 50;
+
+// Stance globali per schieramento: bonus CR applicato a tutte le unità.
+const STANCES = ["none", "flank", "encircle"];
+const STANCE_CR = { none: 0, flank: 1, encircle: 2 };
+
 /* -------------------------------------------------------------------------- */
 /* Stato condiviso                                                            */
 /* -------------------------------------------------------------------------- */
 
 export function getWarState() {
   const state = game.settings.get(MODULE_ID, STATE_KEY);
-  return { entries: { ...(state?.entries ?? {}) } };
+
+  return {
+    entries: { ...(state?.entries ?? {}) },
+    stances: {
+      ally: STANCES.includes(state?.stances?.ally) ? state.stances.ally : "none",
+      enemy: STANCES.includes(state?.stances?.enemy) ? state.stances.enemy : "none",
+    },
+    rush: Boolean(state?.rush),
+  };
 }
 
 /**
@@ -25,7 +40,14 @@ export function getWarState() {
  * inviano la richiesta via socket al GM, che la applica per tutti.
  */
 export async function commitWarState(next) {
-  const payload = { entries: next?.entries ?? {} };
+  const payload = {
+    entries: next?.entries ?? {},
+    stances: {
+      ally: STANCES.includes(next?.stances?.ally) ? next.stances.ally : "none",
+      enemy: STANCES.includes(next?.stances?.enemy) ? next.stances.enemy : "none",
+    },
+    rush: Boolean(next?.rush),
+  };
 
   if (game.user.isGM) {
     return game.settings.set(MODULE_ID, STATE_KEY, payload);
@@ -58,7 +80,7 @@ export async function toggleTokensInWar(tokens) {
 
   const state = getWarState();
   const allPresent = list.every((token) => state.entries[token.document.uuid]);
-  const next = { entries: { ...state.entries } };
+  const next = { ...state, entries: { ...state.entries } };
 
   for (const token of list) {
     const id = token.document.uuid;
@@ -202,15 +224,14 @@ export function xpForCR(cr) {
     if (cr + 1e-9 >= key) best = key;
     else break;
   }
-  return CR_XP[best];
+  return Math.max(MIN_XP, Math.floor(CR_XP[best]));
 }
 
 /* -------------------------------------------------------------------------- */
 /* Composizione delle righe del pannello                                      */
 /* -------------------------------------------------------------------------- */
 
-async function resolveEntries() {
-  const state = getWarState();
+async function resolveEntries(state = getWarState()) {
   const entries = await Promise.all(
     Object.entries(state.entries).map(async ([id, entry]) => {
       const tokenDoc = await safeFromUuid(entry.tokenUuid);
@@ -249,6 +270,12 @@ async function resolveEntries() {
   for (const entry of entries) {
     let bonus = commanderBonus[entry.team];
     if (entry.kind === "archer" && entry.effects.ranged) bonus += 2;
+
+    // Bonus globale di schieramento (flank / encircle).
+    const stanceBonus = STANCE_CR[state.stances[entry.team]] ?? 0;
+    bonus += stanceBonus;
+
+    entry.stanceBonus = stanceBonus;
     entry.bonus = bonus;
     entry.effectiveCR = entry.cr + bonus;
     entry.xp = xpForCR(entry.effectiveCR);
@@ -341,10 +368,25 @@ function renderCard(entry, escapeHTML) {
   `;
 }
 
-function renderColumn(team, entries, escapeHTML) {
+function renderColumn(team, entries, stance, escapeHTML) {
   const label = game.i18n.localize(
     team === "ally" ? "FOUNDRY-WAR.panel.allies" : "FOUNDRY-WAR.panel.enemies",
   );
+
+  const stanceButtons = ["flank", "encircle"]
+    .map((value) => {
+      const active = stance === value;
+      const labelKey =
+        value === "flank" ? "FOUNDRY-WAR.panel.flank" : "FOUNDRY-WAR.panel.encircle";
+      return `
+        <button type="button" class="fw-stance${active ? " active" : ""}"
+                data-action="setStance" data-team="${team}" data-stance="${value}"
+                aria-pressed="${active}">
+          ${game.i18n.localize(labelKey)}
+        </button>
+      `;
+    })
+    .join("");
 
   const cards = entries.length
     ? entries.map((entry) => renderCard(entry, escapeHTML)).join("")
@@ -357,23 +399,31 @@ function renderColumn(team, entries, escapeHTML) {
         ${label}
         <span class="fw-count">${entries.length}</span>
       </h2>
+      <div class="fw-stances">${stanceButtons}</div>
       <div class="fw-list">${cards}</div>
     </section>
   `;
 }
 
 async function buildPanelElement() {
-  const entries = await resolveEntries();
+  const state = getWarState();
+  const entries = await resolveEntries(state);
   const { escapeHTML } = foundry.utils;
 
   const root = document.createElement("div");
   root.className = "fw-panel";
   root.innerHTML = `
     <div class="fw-columns">
-      ${renderColumn("ally", entries.filter((e) => e.team === "ally"), escapeHTML)}
-      ${renderColumn("enemy", entries.filter((e) => e.team === "enemy"), escapeHTML)}
+      ${renderColumn("ally", entries.filter((e) => e.team === "ally"), state.stances.ally, escapeHTML)}
+      ${renderColumn("enemy", entries.filter((e) => e.team === "enemy"), state.stances.enemy, escapeHTML)}
     </div>
     <footer class="fw-footer">
+      <button type="button" class="fw-rush${state.rush ? " active" : ""}"
+              data-action="toggleRush" aria-pressed="${state.rush}"
+              data-tooltip="${game.i18n.localize("FOUNDRY-WAR.panel.rushHint")}">
+        <i class="fa-solid fa-bolt"></i>
+        ${game.i18n.localize("FOUNDRY-WAR.panel.rush")}
+      </button>
       <button type="button" class="fw-simulate" data-action="simulateWar">
         <i class="fa-solid fa-dice-d20"></i>
         ${game.i18n.localize("FOUNDRY-WAR.panel.simulate")}
@@ -405,6 +455,8 @@ export class WarPanel extends ApplicationV2 {
       removeEntry: WarPanel.onRemoveEntry,
       toggleEffect: WarPanel.onToggleEffect,
       adjustCR: WarPanel.onAdjustCR,
+      setStance: WarPanel.onSetStance,
+      toggleRush: WarPanel.onToggleRush,
     },
   };
 
@@ -428,9 +480,27 @@ export class WarPanel extends ApplicationV2 {
     if (!entryId) return;
 
     const state = getWarState();
-    const next = { entries: { ...state.entries } };
-    delete next.entries[entryId];
-    await commitWarState(next);
+    const entries = { ...state.entries };
+    delete entries[entryId];
+    await commitWarState({ ...state, entries });
+  }
+
+  static async onSetStance(_event, target) {
+    const { team, stance } = target.dataset;
+    if (!["ally", "enemy"].includes(team) || !STANCES.includes(stance)) return;
+
+    const state = getWarState();
+    const nextStance = state.stances[team] === stance ? "none" : stance;
+
+    await commitWarState({
+      ...state,
+      stances: { ...state.stances, [team]: nextStance },
+    });
+  }
+
+  static async onToggleRush() {
+    const state = getWarState();
+    await commitWarState({ ...state, rush: !state.rush });
   }
 
   static async onToggleEffect(_event, target) {
@@ -445,6 +515,7 @@ export class WarPanel extends ApplicationV2 {
     effects[effect] = !(effects[effect] ?? true);
 
     await commitWarState({
+      ...state,
       entries: { ...state.entries, [entryId]: { ...entry, effects } },
     });
   }
@@ -468,6 +539,7 @@ export class WarPanel extends ApplicationV2 {
     const cr = Math.max(0, Math.round((base + delta) * 1000) / 1000);
 
     await commitWarState({
+      ...state,
       entries: { ...state.entries, [entryId]: { ...entry, cr } },
     });
   }
