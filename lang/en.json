@@ -3,6 +3,13 @@
     "header": {
       "war": "War"
     },
+    "controls": {
+      "togglePanel": "Toggle War Panel"
+    },
+    "hud": {
+      "add": "Add to War",
+      "remove": "Remove from War"
+    },
     "settings": {
       "enabled": {
         "name": "Enable Foundry War",
@@ -29,13 +36,35 @@
       "cancel": "Cancel",
       "saved": "War configuration saved for {name}."
     },
+    "panel": {
+      "title": "War Panel",
+      "allies": "Allies",
+      "enemies": "Enemies",
+      "empty": "No units",
+      "cr": "Challenge Rating",
+      "hp": "Hit Points",
+      "type": "Type",
+      "remove": "Remove from panel",
+      "simulate": "Simulate war"
+    },
+    "effects": {
+      "inspiration": "War inspiration (+1 CR)",
+      "ranged": "Ranged attack (+2 CR)"
+    },
+    "simulate": {
+      "chat": "Convert everyone's CR into experience",
+      "allies": "Allies experience: {xp} XP",
+      "enemies": "Enemies experience: {xp} XP"
+    },
     "warnings": {
       "noActor": "Select a token or open an actor sheet first.",
       "noPermission": "You do not have permission to configure this actor."
     },
     "notifications": {
       "ready": "Foundry War loaded. Open an actor's ⋯ menu and choose War.",
-      "pong": "Foundry War is working!"
+      "pong": "Foundry War is working!",
+      "added": "{count} tokens added to the war panel.",
+      "removed": "{count} tokens removed from the war panel."
     }
   }
 }

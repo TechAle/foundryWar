@@ -1,4 +1,6 @@
-/* Stili del modulo. */
+/* ========================================================================== */
+/* Dialog configurazione Guerra                                               */
+/* ========================================================================== */
 
 .foundry-war-config .form-group {
   margin-bottom: 0.75rem;
@@ -8,6 +10,247 @@
   margin-top: 0.25rem;
   font-size: var(--font-size-12, 0.75rem);
   opacity: 0.8;
+}
+
+/* ========================================================================== */
+/* Token HUD                                                                  */
+/* ========================================================================== */
+
+.foundry-war-hud.active {
+  color: #7bd88f;
+  box-shadow: 0 0 10px #7bd88f;
+  border-color: #7bd88f;
+}
+
+/* ========================================================================== */
+/* Pannello di guerra                                                         */
+/* ========================================================================== */
+
+.foundry-war-panel-app .window-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+.fw-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.fw-columns {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  min-height: 0;
+}
+
+.fw-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.fw-column.fw-ally {
+  border-color: #3c6e47;
+}
+
+.fw-column.fw-enemy {
+  border-color: #7a2f2f;
+}
+
+.fw-column-title {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  font-size: var(--font-size-16, 1rem);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #555);
+}
+
+.fw-column.fw-ally .fw-column-title {
+  color: #7bd88f;
+  background: rgba(60, 110, 71, 0.18);
+}
+
+.fw-column.fw-enemy .fw-column-title {
+  color: #ff8a8a;
+  background: rgba(122, 47, 47, 0.18);
+}
+
+.fw-count {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.05rem 0.45rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.fw-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fw-empty {
+  opacity: 0.6;
+  font-style: italic;
+  text-align: center;
+  padding: 1rem 0;
+  margin: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Card unità                                                                 */
+/* -------------------------------------------------------------------------- */
+
+.fw-card {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.4rem;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  align-items: flex-start;
+}
+
+.fw-ally .fw-card {
+  border-left: 3px solid #3c6e47;
+}
+
+.fw-enemy .fw-card {
+  border-left: 3px solid #7a2f2f;
+}
+
+.fw-token {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.fw-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fw-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.fw-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fw-remove {
+  margin-left: auto;
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  padding: 0.1rem 0.25rem;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.fw-remove:hover {
+  opacity: 1;
+  color: #ff6b6b;
+}
+
+.fw-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.7rem;
+  margin-top: 0.2rem;
+  font-size: var(--font-size-12, 0.75rem);
+}
+
+.fw-stat b {
+  opacity: 0.7;
+  font-weight: 600;
+  margin-right: 0.15rem;
+}
+
+.fw-type {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fw-bonus {
+  color: #f0c674;
+  font-weight: 700;
+}
+
+.fw-effects {
+  margin-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+.fw-effect {
+  font-size: var(--font-size-12, 0.75rem);
+  text-align: left;
+  padding: 0.1rem 0.3rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.fw-effect.active {
+  opacity: 1;
+  color: #7bd88f;
+}
+
+.fw-effect:hover {
+  border-color: var(--color-border-light-tertiary, #555);
+}
+
+.fw-effect i {
+  margin-right: 0.2rem;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Footer                                                                     */
+/* -------------------------------------------------------------------------- */
+
+.fw-footer {
+  padding: 0.5rem;
+  border-top: 1px solid var(--color-border-light-tertiary, #555);
+  display: flex;
+  justify-content: center;
+}
+
+.fw-simulate {
+  padding: 0.4rem 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .foundry-war-highlight {

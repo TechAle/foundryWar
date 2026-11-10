@@ -20,6 +20,25 @@ localizzazione e release automatica su GitHub.
 - API per macro: `game.foundryWar.getWarData(actor)`,
   `game.foundryWar.setWarData(actor, data)`, `game.foundryWar.openConfig(actor)`.
 
+### Pannello di guerra
+
+- Nei **Token Controls** (colonna sinistra della scena) c'è il tool
+  **Mostra/nascondi pannello guerra**.
+- Click destro su un token → icona bandiera nel Token HUD:
+  aggiunge o rimuove il token dal pannello. Con più token selezionati
+  l'operazione vale per tutta la selezione.
+- Il pannello è diviso in **Alleati** (sinistra) e **Nemici** (destra) e mostra
+  per ogni unità token, CR, HP e tipo di truppa.
+- Effetti per tipo (calcolati **solo** nel pannello, mai scritti sulla scheda):
+  - **Comandante** → *Ispirazione da guerra*: +1 CR a tutte le unità dello
+    stesso schieramento (attivo di default).
+  - **Arciere** → *Attacco a distanza*: +2 CR a se stesso (attivo di default).
+- **Simula guerra**: scrive in chat "Trasforma il CR di tutti quanti in
+  esperienza" e mostra due notifiche con gli XP totali di alleati e nemici.
+- Lo stato è una **world setting**, quindi condiviso in tempo reale tra tutti i
+  client. I giocatori senza permessi di modifica passano la richiesta al GM via
+  socket; il GM applica la modifica per tutti.
+
 ---
 
 ## 1. Requisiti

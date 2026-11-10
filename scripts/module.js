@@ -1,8 +1,9 @@
 /**
- * Foundry War - modulo di esempio per Foundry VTT v13 (build 351).
+ * Foundry War - modulo per Foundry VTT v13 (build 351).
  *
  * Questo file viene caricato come ES module (vedi "esmodules" in module.json).
- * La configurazione "War" delle schede Attore è in scripts/war-config.js.
+ * - scripts/war-config.js  -> configurazione Guerra nelle schede Attore
+ * - scripts/war-panel.js   -> pannello condiviso, Token HUD e simulazione XP
  */
 
 import {
@@ -11,10 +12,19 @@ import {
   setWarData,
 } from "./war-config.js";
 
+import {
+  commitWarState,
+  getWarState,
+  refreshWarPanel,
+  toggleTokensInWar,
+  toggleWarPanel,
+} from "./war-panel.js";
+
 const MODULE_ID = "foundry-war";
+const STATE_KEY = "warState";
 
 /* -------------------------------------------------------------------------- */
-/* init: registra impostazioni, keybinding, tipi di dati, ecc.                */
+/* init: impostazioni                                                         */
 /* -------------------------------------------------------------------------- */
 Hooks.once("init", () => {
   console.log(`${MODULE_ID} | init`);
@@ -36,24 +46,41 @@ Hooks.once("init", () => {
     type: String,
     default: "Fanteria, Cavalleria, Arcieri, Artiglieria, Mostro, Comandante",
   });
+
+  // Stato del pannello: world setting = condivisa con tutti i client.
+  game.settings.register(MODULE_ID, STATE_KEY, {
+    scope: "world",
+    config: false,
+    type: Object,
+    default: { entries: {} },
+  });
 });
 
 /* -------------------------------------------------------------------------- */
-/* ready: il mondo è pronto, `game` e i documenti sono disponibili.            */
+/* ready                                                                      */
 /* -------------------------------------------------------------------------- */
 Hooks.once("ready", () => {
   console.log(`${MODULE_ID} | ready`);
 
-  // API pubblica del modulo, richiamabile da macro:
-  //   game.foundryWar.openConfig(actor)
-  //   game.foundryWar.getWarData(actor)
+  // API per macro.
   game.foundryWar = {
     version: game.modules.get(MODULE_ID)?.version ?? "dev",
     ping: () => ui.notifications.info(game.i18n.localize("FOUNDRY-WAR.notifications.pong")),
     openConfig: openWarConfig,
     getWarData,
     setWarData,
+    togglePanel: toggleWarPanel,
+    getPanelState: getWarState,
+    setPanelState: commitWarState,
+    toggleTokens: toggleTokensInWar,
   };
+
+  // I client senza permessi di modifica delegano le scritture al GM.
+  game.socket.on(`module.${MODULE_ID}`, (payload) => {
+    if (!game.user.isGM) return;
+    if (payload?.type !== "setWarState") return;
+    game.settings.set(MODULE_ID, STATE_KEY, payload.state);
+  });
 
   if (!game.settings.get(MODULE_ID, "enabled")) return;
 
@@ -61,15 +88,39 @@ Hooks.once("ready", () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Comando chat "/war": apre la configurazione per il token selezionato.      */
+/* Token controls: "Toggle War Panel"                                         */
 /* -------------------------------------------------------------------------- */
-Hooks.on("chatMessage", (_chatLog, message) => {
-  if (message.trim() !== "/war") return true;
-  if (!game.settings.get(MODULE_ID, "enabled")) return true;
+Hooks.on("getSceneControlButtons", (controls) => {
+  const tokenControls = controls?.tokens;
+  if (!tokenControls?.tools) return;
 
-  const actor =
-    canvas.tokens?.controlled?.[0]?.actor ?? game.user.character ?? null;
-
-  openWarConfig(actor);
-  return false;
+  tokenControls.tools["foundry-war-panel"] = {
+    name: "foundry-war-panel",
+    title: "FOUNDRY-WAR.controls.togglePanel",
+    icon: "fa-solid fa-flag",
+    order: Object.keys(tokenControls.tools).length,
+    button: true,
+    visible: true,
+    onChange: () => toggleWarPanel(),
+  };
 });
+
+/* -------------------------------------------------------------------------- */
+/* Aggiornamenti condivisi -> ridisegna il pannello                           */
+/* -------------------------------------------------------------------------- */
+Hooks.on("updateSetting", (setting) => {
+  const id = setting?._id ?? "";
+  const key = setting?.key ?? "";
+  const isWarState =
+    id === `${MODULE_ID}.${STATE_KEY}` ||
+    key === `${MODULE_ID}.${STATE_KEY}` ||
+    key === STATE_KEY;
+
+  if (isWarState) refreshWarPanel();
+});
+
+Hooks.on("updateActor", (_actor, changes) => {
+  if (changes?.flags?.[MODULE_ID] || changes?.system) refreshWarPanel();
+});
+
+Hooks.on("deleteToken", () => refreshWarPanel());

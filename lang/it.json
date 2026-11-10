@@ -3,6 +3,13 @@
     "header": {
       "war": "Guerra"
     },
+    "controls": {
+      "togglePanel": "Mostra/nascondi pannello guerra"
+    },
+    "hud": {
+      "add": "Aggiungi a Guerra",
+      "remove": "Rimuovi da Guerra"
+    },
     "settings": {
       "enabled": {
         "name": "Abilita Foundry War",
@@ -29,13 +36,35 @@
       "cancel": "Annulla",
       "saved": "Configurazione guerra salvata per {name}."
     },
+    "panel": {
+      "title": "Pannello di guerra",
+      "allies": "Alleati",
+      "enemies": "Nemici",
+      "empty": "Nessuna unità",
+      "cr": "Challenge Rating",
+      "hp": "Punti ferita",
+      "type": "Tipo",
+      "remove": "Rimuovi dal pannello",
+      "simulate": "Simula guerra"
+    },
+    "effects": {
+      "inspiration": "Ispirazione da guerra (+1 CR)",
+      "ranged": "Attacco a distanza (+2 CR)"
+    },
+    "simulate": {
+      "chat": "Trasforma il CR di tutti quanti in esperienza",
+      "allies": "Esperienza alleati: {xp} XP",
+      "enemies": "Esperienza nemici: {xp} XP"
+    },
     "warnings": {
       "noActor": "Seleziona un token o apri la scheda di un attore.",
       "noPermission": "Non hai i permessi per configurare questo attore."
     },
     "notifications": {
       "ready": "Foundry War caricato. Apri il menu ⋯ di un attore e scegli Guerra.",
-      "pong": "Foundry War funziona!"
+      "pong": "Foundry War funziona!",
+      "added": "{count} token aggiunti al pannello di guerra.",
+      "removed": "{count} token rimossi dal pannello di guerra."
     }
   }
 }

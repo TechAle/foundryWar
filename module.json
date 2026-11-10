@@ -2,8 +2,9 @@
   "id": "foundry-war",
   "title": "Foundry War",
   "description": "Un modulo di esempio per Foundry VTT v13. Cambia questo testo con la descrizione del tuo modulo.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "library": false,
+  "socket": true,
   "compatibility": {
     "minimum": "13",
     "verified": "13.351"
