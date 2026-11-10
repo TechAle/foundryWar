@@ -8,11 +8,10 @@
  *   schieramento) e arcieri (+2 CR a se stessi). Le schede non vengono toccate.
  */
 
+import { xpForCR } from "./battle-engine.js";
+
 const MODULE_ID = "foundry-war";
 const STATE_KEY = "warState";
-
-// XP minimo e arrotondamento per difetto.
-const MIN_XP = 50;
 
 // Stance globali per schieramento: bonus CR applicato a tutte le unità.
 const STANCES = ["none", "flank", "encircle"];
@@ -171,60 +170,6 @@ function formatCR(cr) {
   if (cr === 0.5) return "1/2";
   if (Number.isInteger(cr)) return String(cr);
   return String(Number(cr.toFixed(2)));
-}
-
-/* -------------------------------------------------------------------------- */
-/* Esperienza                                                                 */
-/* -------------------------------------------------------------------------- */
-
-const CR_XP = {
-  0: 10,
-  0.125: 25,
-  0.25: 50,
-  0.5: 100,
-  1: 200,
-  2: 450,
-  3: 700,
-  4: 1100,
-  5: 1800,
-  6: 2300,
-  7: 2900,
-  8: 3900,
-  9: 5000,
-  10: 5900,
-  11: 7200,
-  12: 8400,
-  13: 10000,
-  14: 11500,
-  15: 13000,
-  16: 15000,
-  17: 18000,
-  18: 20000,
-  19: 22000,
-  20: 25000,
-  21: 33000,
-  22: 41000,
-  23: 50000,
-  24: 62000,
-  25: 75000,
-  26: 90000,
-  27: 105000,
-  28: 120000,
-  29: 135000,
-  30: 155000,
-};
-
-export function xpForCR(cr) {
-  const keys = Object.keys(CR_XP)
-    .map(Number)
-    .sort((a, b) => a - b);
-
-  let best = keys[0];
-  for (const key of keys) {
-    if (cr + 1e-9 >= key) best = key;
-    else break;
-  }
-  return Math.max(MIN_XP, Math.floor(CR_XP[best]));
 }
 
 /* -------------------------------------------------------------------------- */

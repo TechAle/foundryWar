@@ -169,6 +169,25 @@ npm run check
 npm run zip
 ```
 
+## 7. Simulatore Node (battaglie)
+
+Il motore puro è in `scripts/battle-engine.js` (usabile anche da Foundry),
+il runner CLI in `sim/run.mjs`.
+
+```bash
+# report demo con 4 scenari (curva che si sposta)
+node sim/run.mjs
+
+# scenario singolo: 10 truppe CR 1 + 2 CR 3 contro 8 truppe CR 2
+node sim/run.mjs --ally "1x10,3x2" --enemy "2x8" --runs 20000
+
+# rush e soglia vittoria schiacciante
+node sim/run.mjs --ally "1x30" --enemy "1x10" --rush true --threshold 0.95
+```
+
+Genera `sim/out/report.html` (grafico interattivo) e `sim/out/report.json`.
+Dettagli e opzioni in [sim/README.md](sim/README.md).
+
 ## Licenza
 
 MIT — vedi [LICENSE](LICENSE).
