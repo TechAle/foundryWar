@@ -88,6 +88,14 @@ https://github.com/TechAle/foundryWar/releases/latest/download/module.json
 
 Questo URL punta sempre all'ultima release, quindi gli aggiornamenti arrivano da soli.
 
+Il `module.json` dentro la release ha `manifest` verso `releases/latest/download/module.json`
+e `download` verso lo zip della versione specifica: Foundry può quindi accorgersi delle
+versioni successive senza reinstallare.
+
+> Se subito dopo una release `releases/latest` restituisce ancora la versione precedente,
+> è la cache di GitHub: basta attendere qualche minuto. In alternativa installa
+> dall'URL versionato `releases/download/v0.2.1/module.json`.
+
 > ⚠️ **Non usare l'URL della pagina GitHub** (`https://github.com/TechAle/foundryWar/blob/main/module.json`).
 > Quello restituisce HTML, non JSON, e Foundry dà `error parsing ... unexpected token '<'`.
 >

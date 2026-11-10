@@ -47,7 +47,9 @@ jobs:
           manifest.url = `https://github.com/${repo}`;
           manifest.bugs = `https://github.com/${repo}/issues`;
           manifest.changelog = `https://github.com/${repo}/releases`;
-          manifest.manifest = `https://github.com/${repo}/releases/download/v${version}/module.json`;
+          // "manifest" resta stabile: Foundry lo ricontrolla per trovare gli aggiornamenti.
+          manifest.manifest = `https://github.com/${repo}/releases/latest/download/module.json`;
+          // "download" punta allo zip di questa specifica versione.
           manifest.download = `https://github.com/${repo}/releases/download/v${version}/module.zip`;
 
           fs.writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n");
