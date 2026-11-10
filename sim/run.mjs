@@ -22,7 +22,9 @@ import {
   DEFAULT_DICE,
   DEFAULT_DECISIVE_THRESHOLD,
   DEFAULT_LOSS_CAP,
+  MIN_XP,
   simulateDistribution,
+  xpForCR,
 } from "../scripts/battle-engine.js";
 
 /* -------------------------------------------------------------------------- */
@@ -110,10 +112,13 @@ const distribution = simulateDistribution(config, runs, settings.seed);
 
 const pct = (value) => `${(value * 100).toFixed(1)}%`;
 const num = (value) => (value == null ? "—" : value.toFixed(1));
+const effective = (battalion) =>
+  Math.floor((battalion.troops * xpForCR(battalion.cr)) / MIN_XP);
 
 console.log(`\nFoundry War — ${runs.toLocaleString("it-IT")} battaglie`);
 console.log(
-  `Alleati: ${ally.troops} truppe CR ${ally.cr} · Nemici: ${enemy.troops} truppe CR ${enemy.cr}`,
+  `Alleati: ${ally.troops} truppe CR ${ally.cr} (= ${effective(ally)} truppe effettive) · ` +
+    `Nemici: ${enemy.troops} truppe CR ${enemy.cr} (= ${effective(enemy)} truppe effettive)`,
 );
 console.log(
   `alpha=${alpha}  rush=${rush}  lossCap=${lossCap}  dice=${dice}  soglia=${threshold}\n`,
@@ -305,7 +310,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
   <div class="cards">
     <div class="card panel"><div class="k">Vittoria alleati</div><div class="v" id="allyWin">—</div></div>
     <div class="card panel"><div class="k">Vittoria nemici</div><div class="v" id="enemyWin">—</div></div>
-    <div class="card panel"><div class="k">Perdite medie</div><div class="v" id="avgLosses">—</div></div>
+    <div class="card panel"><div class="k">Perdite medie (eff.)</div><div class="v" id="avgLosses">—</div></div>
+    <div class="card panel"><div class="k">Truppe effettive</div><div class="v" id="effective">—</div></div>
     <div class="card panel"><div class="k">Esito</div><div class="v" id="decisive">—</div></div>
   </div>
 
@@ -321,7 +327,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
   </div>
 
   <p class="note">
-    Asse X: truppe alleate rimaste meno truppe nemiche rimaste (positivo = vantaggio alleato).
+    Tutto è in <b>truppe effettive</b>: truppe × XP(CR) / 50. Esempio: CR 1 = 4 truppe effettive,
+    CR 2 = 9, CR 5 = 36. Asse X: truppe effettive alleate rimaste − nemiche (positivo = vantaggio alleato).
     Le linee delle perdite mostrano la perdita media <b>condizionata</b> a quell'esito.
     Passa il mouse sul grafico per i valori esatti.
   </p>
@@ -373,6 +380,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     allyWin: document.getElementById("allyWin"),
     enemyWin: document.getElementById("enemyWin"),
     avgLosses: document.getElementById("avgLosses"),
+    effectiveOut: document.getElementById("effective"),
     decisive: document.getElementById("decisive"),
     status: document.getElementById("status"),
     svg: document.getElementById("chart"),
@@ -391,9 +399,15 @@ function buildReportHtml({ engineSource, initial, settings }) {
     return Number(value).toFixed(1).replace(/\\.0$/, "");
   }
 
+  function effectiveTroops(troops, cr) {
+    return Math.floor((troops * Engine.xpForCR(cr)) / 50);
+  }
+
   function syncOutputs() {
-    els.allyTroopsOut.textContent = state.allyTroops;
-    els.enemyTroopsOut.textContent = state.enemyTroops;
+    els.allyTroopsOut.textContent =
+      state.allyTroops + " → " + effectiveTroops(state.allyTroops, state.allyCR) + " eff.";
+    els.enemyTroopsOut.textContent =
+      state.enemyTroops + " → " + effectiveTroops(state.enemyTroops, state.enemyCR) + " eff.";
     els.allyCROut.textContent = fmtCR(state.allyCR);
     els.enemyCROut.textContent = fmtCR(state.enemyCR);
     els.alphaOut.textContent = Number(state.alpha).toFixed(2);
@@ -618,8 +632,15 @@ function buildReportHtml({ engineSource, initial, settings }) {
 
   function updateCards(distribution) {
     var avg = distribution.average;
+    var allyEff = effectiveTroops(state.allyTroops, state.allyCR);
+    var enemyEff = effectiveTroops(state.enemyTroops, state.enemyCR);
+
     els.allyWin.textContent = (distribution.allyWinRate * 100).toFixed(1) + "%";
     els.enemyWin.textContent = (distribution.enemyWinRate * 100).toFixed(1) + "%";
+    els.effectiveOut.innerHTML =
+      '<span style="color:var(--ally)" title="alleati">A ' + allyEff.toLocaleString("it-IT") + '</span>' +
+      ' <small>/</small> ' +
+      '<span style="color:var(--enemy)" title="nemici">N ' + enemyEff.toLocaleString("it-IT") + '</span>';
     els.avgLosses.innerHTML = avg
       ? '<span style="color:var(--ally)" title="alleati">A ' + avg.allies.losses.toFixed(1) + '</span>' +
         ' <small>/</small> ' +

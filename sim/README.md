@@ -6,9 +6,15 @@ Non richiede Foundry né dipendenze npm.
 ## Modello
 
 - Ogni battaglione ha `troops` (le HP) e un `cr` per truppa.
-- La forza di una truppa è l'XP del suo CR: minimo **50**, arrotondato per difetto.
-- Ogni round ogni lato schiera fino a `dice` truppe (le più forti, default 3).
-- Ogni truppa confronta `forza × jitter`, con jitter log-normale troncato a ±2σ.
+- Le truppe vengono convertite in **truppe effettive**:
+  `truppe effettive = truppe × XP(CR) / 50`.
+  - CR 1 → 4 truppe effettive per truppa
+  - CR 2 → 9
+  - CR 5 → 36
+  - CR 10 → 118
+- Ogni truppa effettiva vale 1: il vantaggio di un CR alto è nel numero di truppe.
+- Ogni round ogni lato schiera fino a `dice` truppe effettive (default 3).
+- Ogni confronto usa un jitter log-normale troncato a ±2σ.
 - `alpha` controlla il caos: `sigma = alpha × 0.6`.
   - `0` → deterministico
   - `0.3` → default
@@ -64,6 +70,7 @@ In `sim/out/report.html`:
 - **slider** per il CR dei due lati (0–20)
 - **slider** per alpha
 - **checkbox** Rush
+- card **Truppe effettive**: mostra subito `truppe × XP(CR) / 50` per i due lati
 - il grafico si ricalcola in tempo reale (debounce ~90 ms)
 
 Il grafico ha due assi:
@@ -88,4 +95,8 @@ open sim/out/report.html        # macOS
   mentire rispetto al risultato reale.
 - Le curve sono smussate solo per la visualizzazione; il tooltip usa i valori
   reali dei bin.
+- Per armate molto grandi (oltre 2000 truppe effettive) la simulazione scala
+  **entrambi i lati dello stesso fattore**, così i rapporti restano identici ma
+  la battaglia non dura decine di migliaia di round. Le perdite mostrate sono
+  riportate alle truppe effettive reali.
 - `sim/out/` è generata e ignorata da git.

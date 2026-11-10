@@ -5,10 +5,12 @@
  *
  * Modello:
  * - Ogni battaglione ha `troops` truppe (HP) e un `cr` per truppa.
- * - La forza di una truppa è l'XP del suo CR (minimo 50, arrotondato per difetto).
- * - Ogni round ogni lato schiera fino a `dice` truppe (le più forti).
- * - Ogni truppa confronta `forza * jitter`, con jitter log-normale troncato.
- * - Chi perde il confronto perde 1 truppa.
+ * - Ogni truppa viene convertita in "truppe effettive":
+ *     truppe effettive = truppe × XP(CR) / 50
+ *   (XP minimo 50, arrotondato per difetto; la curva XP 5e resta non lineare).
+ * - Ogni truppa effettiva vale 1: il vantaggio di un CR alto è nel numero.
+ * - Ogni round ogni lato schiera fino a `dice` truppe effettive.
+ * - Ogni confronto usa un jitter log-normale troncato; chi perde perde 1 truppa.
  * - `alpha` (0..1) regola il caos: 0 = deterministico, 1 = molto casuale.
  * - `rush = false` limita le perdite cumulative al `lossCap` (default 50%): la
  *   battaglia può finire senza distruggere un lato.
@@ -23,7 +25,11 @@ export const DEFAULT_ALPHA = 0.3;
 export const DEFAULT_DICE = 3;
 export const DEFAULT_LOSS_CAP = 0.5;
 export const DEFAULT_DECISIVE_THRESHOLD = 0.95;
-export const DEFAULT_MAX_ROUNDS = 5000;
+export const DEFAULT_MAX_ROUNDS = 20000;
+
+// Per armate enormi la simulazione scala i due lati mantenendo i rapporti:
+// evita battaglie da decine di migliaia di round senza cambiare l'esito.
+export const MAX_SIM_TROOPS = 2000;
 
 export const CR_XP = {
   0: 10,
@@ -108,49 +114,78 @@ function truncatedNormal(rng, limit = 2) {
   return 0;
 }
 
+/**
+ * Converte un lato in "truppe effettive".
+ *
+ * truppe effettive = truppe × XP(CR) / 50
+ *
+ * Ogni truppa effettiva vale 1: il vantaggio di un CR alto è tutto nel numero
+ * di truppe effettive (la curva XP 5e resta non lineare).
+ */
 function buildSide(battalions, bonus, lossCap) {
-  const troops = [];
+  let effective = 0;
+  let raw = 0;
+  let xp = 0;
 
   for (const battalion of battalions ?? []) {
     const cr = Math.max(0, Number(battalion.cr ?? 0) + Number(bonus ?? 0));
-    const power = xpForCR(cr);
+    const perTroopXp = xpForCR(cr);
     const count = Math.max(0, Math.floor(Number(battalion.troops ?? 0)));
-    for (let i = 0; i < count; i++) troops.push({ power });
+
+    raw += count;
+    xp += count * perTroopXp;
+    effective += Math.floor((count * perTroopXp) / MIN_XP);
   }
 
   return {
-    initial: troops.length,
-    troops,
+    initial: effective,
+    remaining: effective,
     losses: 0,
-    cap: Math.ceil(troops.length * lossCap),
+    cap: Math.ceil(effective * lossCap),
+    raw,
+    xp,
   };
 }
 
-function pickTop(troops, count) {
-  const top = [];
+function compareSurvivors(allies, enemies) {
+  if (allies.remaining === enemies.remaining) return "draw";
+  return allies.remaining > enemies.remaining ? "ally" : "enemy";
+}
 
-  for (const troop of troops) {
-    if (top.length < count) {
-      top.push(troop);
-      top.sort((a, b) => b.power - a.power);
-    } else if (troop.power > top[top.length - 1].power) {
-      top[top.length - 1] = troop;
-      top.sort((a, b) => b.power - a.power);
-    }
+function scaleSide(side, scale, lossCap) {
+  if (scale <= 1) return side;
+
+  const count =
+    side.initial > 0 ? Math.max(1, Math.round(side.initial / scale)) : 0;
+
+  return {
+    ...side,
+    initial: count,
+    remaining: count,
+    losses: 0,
+    cap: Math.ceil(count * lossCap),
+  };
+}
+
+function realSide(simSide, original, scale) {
+  if (scale <= 1) {
+    return {
+      initial: original.initial,
+      losses: simSide.losses,
+      survivors: simSide.remaining,
+      raw: original.raw,
+      xp: original.xp,
+    };
   }
 
-  return top;
-}
-
-function removeTroops(troops, removed) {
-  if (!removed.length) return troops;
-  const set = new Set(removed);
-  return troops.filter((troop) => !set.has(troop));
-}
-
-function compareSurvivors(allies, enemies) {
-  if (allies.troops.length === enemies.troops.length) return "draw";
-  return allies.troops.length > enemies.troops.length ? "ally" : "enemy";
+  const losses = Math.min(original.initial, Math.round(simSide.losses * scale));
+  return {
+    initial: original.initial,
+    losses,
+    survivors: original.initial - losses,
+    raw: original.raw,
+    xp: original.xp,
+  };
 }
 
 /**
@@ -163,7 +198,7 @@ function compareSurvivors(allies, enemies) {
  * @param {boolean} [config.rush=false]
  * @param {number} [config.lossCap=0.5]
  * @param {number} [config.dice=3]
- * @param {number} [config.maxRounds=5000]
+ * @param {number} [config.maxRounds=20000]
  * @param {number} [config.allyBonus=0] bonus CR globale (flank/encircle)
  * @param {number} [config.enemyBonus=0]
  * @param {Function} rng
@@ -176,51 +211,49 @@ export function simulateBattle(config, rng) {
   const lossCap = clamp(Number(config.lossCap ?? DEFAULT_LOSS_CAP), 0, 1);
   const maxRounds = Math.max(1, Math.floor(Number(config.maxRounds ?? DEFAULT_MAX_ROUNDS)));
 
-  const allies = buildSide(config.allies, config.allyBonus, lossCap);
-  const enemies = buildSide(config.enemies, config.enemyBonus, lossCap);
+  const realAllies = buildSide(config.allies, config.allyBonus, lossCap);
+  const realEnemies = buildSide(config.enemies, config.enemyBonus, lossCap);
+
+  const scale = Math.max(
+    1,
+    Math.ceil(Math.max(realAllies.initial, realEnemies.initial) / MAX_SIM_TROOPS),
+  );
+
+  const allies = scaleSide(realAllies, scale, lossCap);
+  const enemies = scaleSide(realEnemies, scale, lossCap);
 
   let rounds = 0;
   let winner = null;
 
-  while (allies.troops.length && enemies.troops.length && rounds < maxRounds) {
+  while (allies.remaining > 0 && enemies.remaining > 0 && rounds < maxRounds) {
     rounds += 1;
 
-    const alliedRolls = pickTop(allies.troops, dice)
-      .map((troop) => ({ troop, value: troop.power * Math.exp(sigma * truncatedNormal(rng)) }))
-      .sort((a, b) => b.value - a.value);
-
-    const enemyRolls = pickTop(enemies.troops, dice)
-      .map((troop) => ({ troop, value: troop.power * Math.exp(sigma * truncatedNormal(rng)) }))
-      .sort((a, b) => b.value - a.value);
-
-    const pairs = Math.min(alliedRolls.length, enemyRolls.length);
-    let alliedLosses = [];
-    let enemyLosses = [];
+    const pairs = Math.min(dice, allies.remaining, enemies.remaining);
+    let alliedLosses = 0;
+    let enemyLosses = 0;
 
     for (let i = 0; i < pairs; i++) {
-      const ally = alliedRolls[i];
-      const enemy = enemyRolls[i];
+      const allyRoll = Math.exp(sigma * truncatedNormal(rng));
+      const enemyRoll = Math.exp(sigma * truncatedNormal(rng));
 
-      if (ally.value > enemy.value) enemyLosses.push(enemy.troop);
-      else if (enemy.value > ally.value) alliedLosses.push(ally.troop);
+      if (allyRoll > enemyRoll) enemyLosses += 1;
+      else if (enemyRoll > allyRoll) alliedLosses += 1;
       else {
-        // Pareggio: perdono entrambi (con alpha=0 e forze identiche).
-        alliedLosses.push(ally.troop);
-        enemyLosses.push(enemy.troop);
+        // Pareggio: perdono entrambi (con alpha=0 tutte le truppe sono pari).
+        alliedLosses += 1;
+        enemyLosses += 1;
       }
     }
 
     if (!rush) {
-      const alliedAllowed = Math.max(0, allies.cap - allies.losses);
-      const enemyAllowed = Math.max(0, enemies.cap - enemies.losses);
-      alliedLosses = alliedLosses.slice(0, alliedAllowed);
-      enemyLosses = enemyLosses.slice(0, enemyAllowed);
+      alliedLosses = Math.min(alliedLosses, allies.cap - allies.losses);
+      enemyLosses = Math.min(enemyLosses, enemies.cap - enemies.losses);
     }
 
-    allies.troops = removeTroops(allies.troops, alliedLosses);
-    enemies.troops = removeTroops(enemies.troops, enemyLosses);
-    allies.losses += alliedLosses.length;
-    enemies.losses += enemyLosses.length;
+    allies.remaining -= alliedLosses;
+    allies.losses += alliedLosses;
+    enemies.remaining -= enemyLosses;
+    enemies.losses += enemyLosses;
 
     if (!rush) {
       const alliedCapped = allies.losses >= allies.cap;
@@ -233,33 +266,29 @@ export function simulateBattle(config, rng) {
       }
     }
 
-    if (!allies.troops.length || !enemies.troops.length) {
+    if (allies.remaining <= 0 || enemies.remaining <= 0) {
       winner = compareSurvivors(allies, enemies);
       break;
     }
   }
 
   if (!winner) {
-    if (!allies.troops.length && !enemies.troops.length) winner = "draw";
-    else if (!allies.troops.length) winner = "enemy";
-    else if (!enemies.troops.length) winner = "ally";
+    if (allies.remaining <= 0 && enemies.remaining <= 0) winner = "draw";
+    else if (allies.remaining <= 0) winner = "enemy";
+    else if (enemies.remaining <= 0) winner = "ally";
     else winner = compareSurvivors(allies, enemies);
   }
+
+  const alliesResult = realSide(allies, realAllies, scale);
+  const enemiesResult = realSide(enemies, realEnemies, scale);
 
   return {
     winner,
     rounds,
-    allies: {
-      initial: allies.initial,
-      losses: allies.losses,
-      survivors: allies.troops.length,
-    },
-    enemies: {
-      initial: enemies.initial,
-      losses: enemies.losses,
-      survivors: enemies.troops.length,
-    },
-    margin: allies.troops.length - enemies.troops.length,
+    scale,
+    allies: alliesResult,
+    enemies: enemiesResult,
+    margin: alliesResult.survivors - enemiesResult.survivors,
     decisive: false,
   };
 }
