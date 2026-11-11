@@ -496,9 +496,10 @@ function buildReportHtml({ engineSource, initial, settings }) {
     </div>
     <div class="card panel">
       <div class="k">Pareggi
-        <span class="help" tabindex="0" data-help="Battaglie finite con un margine entro la soglia di pareggio. Con forze identiche il pareggio è simmetrico.">?</span>
+        <span class="help" tabindex="0" data-help="Battaglie finite con un margine entro la soglia di pareggio. Non sono senza perdite: la riga sotto mostra le perdite medie dei pareggi.">?</span>
       </div>
       <div class="v" id="drawRate">—</div>
+      <div class="k" id="drawLosses" style="margin-top:4px">perdite A — / N —</div>
     </div>
     <div class="card panel">
       <div class="k">Perdite medie (eff.)
@@ -549,6 +550,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     <b>Compressione</b>: più è alta, più truppe servono per ottenere lo stesso vantaggio
     (default 0.2; 0 = off). <b>Pareggio</b>: se il margine finale è entro la soglia
     (default 2 truppe), l'esito è un pareggio; con forze identiche succede circa il 14% delle volte.
+    Un pareggio <b>non è senza perdite</b>: la card Pareggi mostra le perdite medie di quei casi.
     Passa il mouse sul grafico per i valori esatti.
   </p>
 
@@ -621,6 +623,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     allyWin: document.getElementById("allyWin"),
     enemyWin: document.getElementById("enemyWin"),
     drawRate: document.getElementById("drawRate"),
+    drawLosses: document.getElementById("drawLosses"),
     avgLosses: document.getElementById("avgLosses"),
     effectiveOut: document.getElementById("effective"),
     totalChance: document.getElementById("totalChance"),
@@ -1026,6 +1029,18 @@ function buildReportHtml({ engineSource, initial, settings }) {
     els.allyWin.textContent = (distribution.allyWinRate * 100).toFixed(1) + "%";
     els.enemyWin.textContent = (distribution.enemyWinRate * 100).toFixed(1) + "%";
     els.drawRate.textContent = (distribution.drawRate * 100).toFixed(1) + "%";
+
+    var drawBin = null;
+    for (var i = 0; i < distribution.bins.length; i++) {
+      if (distribution.bins[i].value === 0) {
+        drawBin = distribution.bins[i];
+        break;
+      }
+    }
+    els.drawLosses.innerHTML = drawBin
+      ? 'perdite <span style="color:var(--ally)">A ' + drawBin.avgAllyLosses.toFixed(1) + '</span>' +
+        ' / <span style="color:var(--enemy)">N ' + drawBin.avgEnemyLosses.toFixed(1) + '</span>'
+      : 'perdite A — / N —';
     els.effectiveOut.innerHTML =
       '<span style="color:var(--ally)" title="alleati">A ' + allyEff.toLocaleString("it-IT") + '</span>' +
       ' <small>/</small> ' +

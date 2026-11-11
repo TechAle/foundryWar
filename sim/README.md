@@ -42,6 +42,8 @@ Non richiede Foundry né dipendenze npm.
 - **Pareggio**: se il margine finale è entro `drawBand` (default 2 truppe
   effettive) e nessuno dei due è stato azzerato, l'esito è un pareggio. Con
   forze identiche succede circa il 14% delle volte. `0` disattiva i pareggi.
+  Un pareggio **non è senza perdite**: è una battaglia con perdite simili da
+  entrambi i lati (nel caso 40 vs 40, ~19 per parte contro 15 di media).
 - **Vittoria totale**: il margine del vincitore è ≥ `totalThreshold`
   (default 80%) delle truppe iniziali **del vincitore**. In pratica il vincitore
   conserva quasi tutto il suo esercito e travolge il perdente. Non è un
