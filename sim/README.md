@@ -44,6 +44,8 @@ Non richiede Foundry né dipendenze npm.
   forze identiche succede circa il 14% delle volte. `0` disattiva i pareggi.
   Un pareggio **non è senza perdite**: è una battaglia con perdite simili da
   entrambi i lati (nel caso 40 vs 40, ~19 per parte contro 15 di media).
+  La fascia attorno a 0 è evidenziata sul grafico e il tooltip, al suo interno,
+  mostra la probabilità complessiva dei pareggi.
 - **Vittoria totale**: il margine del vincitore è ≥ `totalThreshold`
   (default 80%) delle truppe iniziali **del vincitore**. In pratica il vincitore
   conserva quasi tutto il suo esercito e travolge il perdente. Non è un

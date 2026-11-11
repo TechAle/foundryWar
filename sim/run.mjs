@@ -761,6 +761,9 @@ function buildReportHtml({ engineSource, initial, settings }) {
     var xMax = Math.max.apply(null, xValues.concat([0])) + 1;
 
     var smoothed = smoothProbabilities(bins, xMin, xMax);
+    var smoothMap = new Map();
+    smoothed.forEach(function (point) { smoothMap.set(point.value, point.probability); });
+
     var probValues = smoothed.map(function (point) { return point.probability; });
     var lossValues = bins.map(function (b) {
       return Math.max(b.avgAllyLosses, b.avgEnemyLosses);
@@ -896,6 +899,25 @@ function buildReportHtml({ engineSource, initial, settings }) {
       false,
     );
 
+    /* Fascia di pareggio */
+    if (state.drawBand > 0) {
+      var drawX1 = Math.max(M.left, xScale(-state.drawBand));
+      var drawX2 = Math.min(W - M.right, xScale(state.drawBand));
+      if (drawX2 - drawX1 > 1) {
+        svg.appendChild(el("rect", {
+          x: drawX1, y: M.top, width: drawX2 - drawX1,
+          height: H - M.top - M.bottom,
+          fill: "#9aa1ad", opacity: "0.08"
+        }));
+        var drawLabel = el("text", {
+          x: (drawX1 + drawX2) / 2, y: M.top + 14,
+          "text-anchor": "middle", "class": "zone-label", fill: "#9aa1ad"
+        });
+        drawLabel.textContent = "pareggio ±" + state.drawBand;
+        svg.appendChild(drawLabel);
+      }
+    }
+
     /* Probabilità: area + linea */
     var probPoints = smoothed.map(function (point) {
       return [xScale(point.value), yProb(point.probability)];
@@ -977,6 +999,28 @@ function buildReportHtml({ engineSource, initial, settings }) {
       return null;
     }
 
+    function nearestBin(value) {
+      var best = null;
+      var bestDistance = Infinity;
+      bins.forEach(function (bin) {
+        var distance = Math.abs(bin.value - value);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = bin;
+        }
+      });
+      return best;
+    }
+
+    function formatProbability(probability) {
+      if (probability <= 0) return "0%";
+      if (probability < 0.0001) return "<0.01%";
+      if (probability < 0.001) return (probability * 100).toFixed(3) + "%";
+      return (probability * 100).toFixed(2) + "%";
+    }
+
+    var drawBin = binAt(0);
+
     svg.onmousemove = function (event) {
       var rect = svg.getBoundingClientRect();
       var scale = W / rect.width;
@@ -989,19 +1033,40 @@ function buildReportHtml({ engineSource, initial, settings }) {
       hoverLine.setAttribute("opacity", "1");
 
       var bin = binAt(hovered);
+      var detail = bin || nearestBin(hovered);
+      var smoothProbability = smoothMap.get(hovered) ?? 0;
+      var inDrawBand = state.drawBand > 0 && Math.abs(hovered) <= state.drawBand;
+
+      // Dentro la fascia di pareggio mostro la probabilità totale dei pareggi,
+      // non il valore sfumato della KDE in quel singolo punto.
+      if (inDrawBand && drawBin) smoothProbability = drawBin.probability;
+
       var html =
         '<div style="font-weight:700;margin-bottom:6px">Vantaggio ' + hovered + '</div>';
 
-      if (!bin) {
-        html += '<div class="row"><span>Probabilità</span><b>0.00%</b></div>';
-      } else {
+      html +=
+        '<div class="row"><span>Probabilità</span><b>' +
+        formatProbability(smoothProbability) + '</b></div>';
+
+      if (inDrawBand) {
         html +=
-          '<div class="row"><span>Probabilità</span><b>' + (bin.probability * 100).toFixed(2) + '%</b></div>' +
-          '<div class="row"><span>Perdite alleate</span><b style="color:var(--ally)">' + bin.avgAllyLosses.toFixed(1) + '</b></div>' +
-          '<div class="row"><span>Perdite nemiche</span><b style="color:var(--enemy)">' + bin.avgEnemyLosses.toFixed(1) + '</b></div>' +
+          '<div class="row"><span>Esito</span><b style="color:var(--accent)">' +
+          'Pareggio (entro ±' + state.drawBand + ')</b></div>';
+      }
+
+      if (detail) {
+        html +=
+          '<div class="row"><span>Perdite alleate</span><b style="color:var(--ally)">' + detail.avgAllyLosses.toFixed(1) + '</b></div>' +
+          '<div class="row"><span>Perdite nemiche</span><b style="color:var(--enemy)">' + detail.avgEnemyLosses.toFixed(1) + '</b></div>' +
           '<hr>' +
-          '<div class="row"><span>Truppe alleate</span><b>' + bin.avgAllySurvivors.toFixed(1) + '</b></div>' +
-          '<div class="row"><span>Truppe nemiche</span><b>' + bin.avgEnemySurvivors.toFixed(1) + '</b></div>';
+          '<div class="row"><span>Truppe alleate</span><b>' + detail.avgAllySurvivors.toFixed(1) + '</b></div>' +
+          '<div class="row"><span>Truppe nemiche</span><b>' + detail.avgEnemySurvivors.toFixed(1) + '</b></div>';
+
+        if (!bin) {
+          html +=
+            '<div class="row" style="opacity:.55;margin-top:6px">' +
+            '<span>Dettagli dal bin più vicino</span><b>' + detail.value + '</b></div>';
+        }
       }
 
       els.tooltip.innerHTML = html;
