@@ -166,6 +166,8 @@ export function distributeLosses(units, totalLoss, options = {}) {
       troops,
       perTroop,
       effective,
+      vulnerability: Math.max(0, Number(unit.vulnerability ?? 1)),
+      luckyDie: Math.max(0, Math.floor(Number(unit.luckyDie ?? 0))),
       losses: 0,
     };
   });
@@ -175,7 +177,8 @@ export function distributeLosses(units, totalLoss, options = {}) {
 
   const weights = rows.map((row) => {
     if (row.effective <= 0) return 0;
-    const base = row.effective / Math.pow(1 + row.cr, bias);
+    const base =
+      (row.effective / Math.pow(1 + row.cr, bias)) * row.vulnerability;
     const jitter = randomness > 0 ? Math.exp(randomness * truncatedNormal(rng)) : 1;
     return base * jitter;
   });
@@ -200,6 +203,51 @@ export function distributeLosses(units, totalLoss, options = {}) {
     remaining -= consumed;
     active = active.filter((index) => rows[index].effective - rows[index].losses > 1e-9);
     if (consumed <= 1e-9) break;
+  }
+
+  // Lucky: 1dN di riduzione del danno. L'eccedenza viene ridistribuita
+  // sulle unità senza Lucky, se hanno ancora capacità.
+  let luckyReduction = 0;
+
+  for (const row of rows) {
+    if (!row.luckyDie) continue;
+
+    const roll = 1 + Math.floor(rng() * row.luckyDie);
+    const reduction = Math.min(row.losses, roll);
+    row.losses -= reduction;
+    luckyReduction += reduction;
+  }
+
+  if (luckyReduction > 1e-9) {
+    let active = rows
+      .map((_, index) => index)
+      .filter(
+        (index) =>
+          !rows[index].luckyDie &&
+          rows[index].effective - rows[index].losses > 1e-9 &&
+          weights[index] > 0,
+      );
+
+    while (luckyReduction > 1e-9 && active.length) {
+      const totalWeight = active.reduce((sum, index) => sum + weights[index], 0);
+      let consumed = 0;
+
+      for (const index of active) {
+        const row = rows[index];
+        const capacity = row.effective - row.losses;
+        const share =
+          totalWeight > 0 ? (luckyReduction * weights[index]) / totalWeight : 0;
+        const take = Math.min(share, capacity);
+        row.losses += take;
+        consumed += take;
+      }
+
+      luckyReduction -= consumed;
+      active = active.filter(
+        (index) => rows[index].effective - rows[index].losses > 1e-9,
+      );
+      if (consumed <= 1e-9) break;
+    }
   }
 
   return rows.map((row) => {

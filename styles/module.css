@@ -664,6 +664,130 @@
   font-weight: 600;
 }
 
+/* ========================================================================== */
+/* Gestione classi                                                            */
+/* ========================================================================== */
+
+.foundry-war-groups-app .window-content {
+  padding: 0;
+}
+
+.fw-groups {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  height: 100%;
+  min-height: 0;
+}
+
+.fw-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border-right: 1px solid var(--color-border-light-tertiary, #555);
+  min-height: 0;
+}
+
+.fw-groups-new {
+  padding: 0.35rem 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fw-groups-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.fw-group-item {
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.fw-group-item:hover {
+  border-color: #f0c674;
+}
+
+.fw-group-item.active {
+  color: #f0c674;
+  border-color: #f0c674;
+  background: rgba(240, 198, 116, 0.12);
+}
+
+.fw-groups-editor {
+  padding: 0.8rem;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.fw-group-abilities {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0.6rem 0;
+}
+
+.fw-group-ability {
+  display: grid;
+  grid-template-columns: 1.2fr 1.1fr 80px 52px 24px;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.fw-group-ability.head {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.65;
+}
+
+.fw-group-ability input[type="text"],
+.fw-group-ability input[type="number"],
+.fw-group-ability select {
+  width: 100%;
+}
+
+.fw-group-remove {
+  padding: 0;
+  color: var(--color-text-secondary, #999);
+  background: none;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fw-group-remove:hover {
+  color: #ff6b6b;
+}
+
+.fw-groups-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.fw-groups-save {
+  font-weight: 600;
+}
+
+.fw-groups-danger {
+  margin-left: auto;
+}
+
+.fw-groups-danger:hover {
+  color: #ff6b6b;
+}
+
 .foundry-war-highlight {
   color: #ff6400;
   font-weight: bold;

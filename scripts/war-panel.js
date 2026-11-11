@@ -20,6 +20,8 @@ import {
   xpForCR,
 } from "./battle-engine.js";
 
+import { getGroup } from "./war-groups.js";
+
 const MODULE_ID = "foundry-war";
 const STATE_KEY = "warState";
 
@@ -100,7 +102,6 @@ function createEntry(token) {
     actorUuid: token.actor?.uuid ?? "",
     name: doc.name ?? token.actor?.name ?? "?",
     img: doc.texture?.src ?? token.actor?.img ?? "icons/svg/mystery-man.svg",
-    effects: { inspiration: true, ranged: true },
   };
 }
 
@@ -221,26 +222,16 @@ function battleSignature(entries, state, settings) {
       entry.name,
       entry.effectiveCR,
       entry.hp?.value ?? 0,
+      (entry.abilities ?? []).map((ability) => [
+        ability.id,
+        ability.enabled,
+        ability.type,
+        ability.value,
+      ]),
     ]),
     rush: state.rush,
     settings: [settings.alpha, settings.swing, settings.compression, settings.threshold],
   });
-}
-
-function normalizeType(value) {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function troopKind(troopType) {
-  const type = normalizeType(troopType);
-  if (!type) return null;
-  if (type.includes("comandant") || type.includes("commander") || type.includes("capo")) return "commander";
-  if (type.includes("arcier") || type.includes("archer")) return "archer";
-  return null;
 }
 
 function formatCR(cr) {
@@ -261,10 +252,11 @@ async function resolveEntries(state = getWarState()) {
       const tokenDoc = await safeFromUuid(entry.tokenUuid);
       const actor = tokenDoc?.actor ?? (await safeFromUuid(entry.actorUuid));
       const war = actor?.getFlag(MODULE_ID, "war") ?? {};
-
-      const troopType = war.troopType ?? "";
-      const kind = troopKind(troopType);
-      const effects = entry.effects ?? {};
+      const group = getGroup(war.group);
+      const abilities = (group?.abilities ?? []).map((ability) => ({
+        ...ability,
+        enabled: war.abilities?.[ability.id] ?? ability.defaultActive,
+      }));
 
       return {
         id,
@@ -273,29 +265,37 @@ async function resolveEntries(state = getWarState()) {
         name: tokenDoc?.name ?? entry.name ?? actor?.name ?? "?",
         img: tokenDoc?.texture?.src ?? entry.img ?? actor?.img ?? "icons/svg/mystery-man.svg",
         team: war.team === "enemy" ? "enemy" : "ally",
-        troopType,
-        kind,
+        troopType: war.troopType ?? "",
+        groupName: group?.name ?? "",
+        abilities,
         cr: Number.isFinite(entry.cr) ? entry.cr : getCR(actor),
         hp: getHP(actor),
-        effects: {
-          inspiration: effects.inspiration ?? true,
-          ranged: effects.ranged ?? true,
-        },
       };
     }),
   );
 
-  // Bonus dei comandanti, per schieramento.
-  const commanderBonus = { ally: 0, enemy: 0 };
+  const buffAllies = { ally: 0, enemy: 0 };
+  const debuffEnemies = { ally: 0, enemy: 0 };
+
   for (const entry of entries) {
-    if (entry.kind === "commander" && entry.effects.inspiration) {
-      commanderBonus[entry.team] += 1;
+    for (const ability of entry.abilities) {
+      if (!ability.enabled) continue;
+
+      const value = Number(ability.value) || 0;
+      if (ability.type === "buffAllies") buffAllies[entry.team] += value;
+      if (ability.type === "debuffEnemies") debuffEnemies[entry.team] += value;
     }
   }
 
   for (const entry of entries) {
-    let bonus = commanderBonus[entry.team];
-    if (entry.kind === "archer" && entry.effects.ranged) bonus += 2;
+    let bonus = buffAllies[entry.team];
+    bonus -= debuffEnemies[entry.team === "ally" ? "enemy" : "ally"];
+
+    for (const ability of entry.abilities) {
+      if (ability.enabled && ability.type === "buffSelf") {
+        bonus += Number(ability.value) || 0;
+      }
+    }
 
     // Bonus globale di schieramento (flank / encircle).
     const stanceBonus = STANCE_CR[state.stances[entry.team]] ?? 0;
@@ -305,6 +305,25 @@ async function resolveEntries(state = getWarState()) {
     entry.bonus = bonus;
     entry.effectiveCR = entry.cr + bonus;
     entry.xp = xpForCR(entry.effectiveCR);
+
+    let vulnerability = 1;
+    if (entry.abilities.some((ability) => ability.enabled && ability.type === "taunt")) {
+      vulnerability *= 2;
+    }
+    if (entry.abilities.some((ability) => ability.enabled && ability.type === "evasive")) {
+      vulnerability *= 0.5;
+    }
+    if (entry.abilities.some((ability) => ability.enabled && ability.type === "resistant")) {
+      vulnerability *= 0.5;
+    }
+    entry.vulnerability = vulnerability;
+
+    const lucky = entry.abilities.find(
+      (ability) => ability.enabled && ability.type === "lucky",
+    );
+    entry.luckyDie = lucky
+      ? Math.max(1, Math.floor(Number(lucky.value) || 6))
+      : 0;
   }
 
   entries.sort((a, b) => a.name.localeCompare(b.name));
@@ -322,32 +341,35 @@ function renderHP(hp) {
   return `${value} / ${max}`;
 }
 
-function renderEffectButtons(entry) {
-  const buttons = [];
+function renderAbilityButtons(entry, escapeHTML) {
+  const abilities = (entry.abilities ?? []).filter(
+    (ability) => ability.type !== "resistant",
+  );
 
-  if (entry.kind === "commander") {
-    buttons.push(`
-      <button type="button" class="fw-effect${entry.effects.inspiration ? " active" : ""}"
-              data-action="toggleEffect" data-entry-id="${entry.id}" data-effect="inspiration"
-              aria-pressed="${entry.effects.inspiration}">
-        <i class="fa-solid ${entry.effects.inspiration ? "fa-toggle-on" : "fa-toggle-off"}"></i>
-        ${game.i18n.localize("FOUNDRY-WAR.effects.inspiration")}
+  if (!abilities.length) return "";
+
+  const buttons = abilities.map((ability) => {
+    const value = Number(ability.value) || 0;
+    let suffix = "";
+
+    if (ability.type === "buffAllies" || ability.type === "buffSelf") {
+      suffix = ` (+${value} CR)`;
+    } else if (ability.type === "debuffEnemies") {
+      suffix = ` (-${value} CR)`;
+    } else if (ability.type === "lucky") {
+      suffix = ` (1d${value || 6})`;
+    }
+
+    return `
+      <button type="button" class="fw-effect${ability.enabled ? " active" : ""}"
+              data-action="toggleAbility" data-entry-id="${entry.id}" data-ability-id="${ability.id}"
+              aria-pressed="${ability.enabled}">
+        <i class="fa-solid ${ability.enabled ? "fa-toggle-on" : "fa-toggle-off"}"></i>
+        ${escapeHTML(ability.name)}${suffix}
       </button>
-    `);
-  }
+    `;
+  });
 
-  if (entry.kind === "archer") {
-    buttons.push(`
-      <button type="button" class="fw-effect${entry.effects.ranged ? " active" : ""}"
-              data-action="toggleEffect" data-entry-id="${entry.id}" data-effect="ranged"
-              aria-pressed="${entry.effects.ranged}">
-        <i class="fa-solid ${entry.effects.ranged ? "fa-toggle-on" : "fa-toggle-off"}"></i>
-        ${game.i18n.localize("FOUNDRY-WAR.effects.ranged")}
-      </button>
-    `);
-  }
-
-  if (!buttons.length) return "";
   return `<div class="fw-effects">${buttons.join("")}</div>`;
 }
 
@@ -383,12 +405,12 @@ function renderCard(entry, escapeHTML) {
           <span class="fw-stat" data-tooltip="${game.i18n.localize("FOUNDRY-WAR.panel.hp")}">
             <b>HP</b> ${renderHP(entry.hp)}
           </span>
-          <span class="fw-stat fw-type" data-tooltip="${game.i18n.localize("FOUNDRY-WAR.panel.type")}">
-            <b>${game.i18n.localize("FOUNDRY-WAR.panel.type")}</b>
-            ${entry.troopType ? escapeHTML(entry.troopType) : "—"}
+          <span class="fw-stat fw-type" data-tooltip="${game.i18n.localize("FOUNDRY-WAR.panel.group")}">
+            <b>${game.i18n.localize("FOUNDRY-WAR.panel.group")}</b>
+            ${entry.groupName ? escapeHTML(entry.groupName) : "—"}
           </span>
         </div>
-        ${renderEffectButtons(entry)}
+        ${renderAbilityButtons(entry, escapeHTML)}
       </div>
     </article>
   `;
@@ -454,6 +476,8 @@ function buildBattle(entries, state) {
       cr: entry.effectiveCR,
       troops: Math.max(0, Math.floor(entry.hp?.value ?? 0)),
       actor: entry.actor,
+      vulnerability: entry.vulnerability ?? 1,
+      luckyDie: entry.luckyDie ?? 0,
     });
   }
 
@@ -831,7 +855,7 @@ export class WarPanel extends ApplicationV2 {
       rollBattle: WarPanel.onRollBattle,
       applyBattle: WarPanel.onApplyBattle,
       removeEntry: WarPanel.onRemoveEntry,
-      toggleEffect: WarPanel.onToggleEffect,
+      toggleAbility: WarPanel.onToggleAbility,
       adjustCR: WarPanel.onAdjustCR,
       setStance: WarPanel.onSetStance,
       toggleRush: WarPanel.onToggleRush,
@@ -1007,20 +1031,30 @@ export class WarPanel extends ApplicationV2 {
     });
   }
 
-  static async onToggleEffect(_event, target) {
-    const { entryId, effect } = target.dataset;
-    if (!entryId || !effect) return;
+  static async onToggleAbility(_event, target) {
+    const { entryId, abilityId } = target.dataset;
+    if (!entryId || !abilityId) return;
 
     const state = getWarState();
     const entry = state.entries[entryId];
     if (!entry) return;
 
-    const effects = { ...(entry.effects ?? {}) };
-    effects[effect] = !(effects[effect] ?? true);
+    const tokenDoc = await safeFromUuid(entry.tokenUuid);
+    const actor = tokenDoc?.actor ?? (await safeFromUuid(entry.actorUuid));
+    if (!actor) return;
+
+    const war = actor.getFlag(MODULE_ID, "war") ?? {};
+    const group = getGroup(war.group);
+    const ability = group?.abilities?.find((candidate) => candidate.id === abilityId);
+    if (!ability || ability.type === "resistant") return;
+
+    const abilities = { ...(war.abilities ?? {}) };
+    abilities[abilityId] = !(abilities[abilityId] ?? ability.defaultActive);
+
+    await actor.setFlag(MODULE_ID, "war", { ...war, abilities });
 
     await commitWarState({
       ...state,
-      entries: { ...state.entries, [entryId]: { ...entry, effects } },
       battle: { ...state.battle, roll: null },
     });
   }
@@ -1220,29 +1254,109 @@ function getTargetTokens(token) {
   return [token];
 }
 
+function setActorDataHP(data, value) {
+  if (data.system?.attributes?.hp?.value != null) {
+    data.system.attributes.hp.value = value;
+    return true;
+  }
+  if (data.system?.hp?.value != null) {
+    data.system.hp.value = value;
+    return true;
+  }
+  if (data.system?.health?.value != null) {
+    data.system.health.value = value;
+    return true;
+  }
+  return false;
+}
+
+async function splitToken(token) {
+  const actor = token?.actor;
+  if (!actor) return;
+
+  if (!game.user.isGM) {
+    ui.notifications.warn(game.i18n.localize("FOUNDRY-WAR.warnings.noPermission"));
+    return;
+  }
+
+  const hp = getHP(actor);
+  if (!hp || hp.value == null || hp.value < 2) {
+    ui.notifications.warn(game.i18n.localize("FOUNDRY-WAR.warnings.splitImpossible"));
+    return;
+  }
+
+  const total = Math.floor(hp.value);
+  const half = Math.floor(total / 2);
+  const rest = total - half;
+
+  const actorData = actor.toObject();
+  delete actorData._id;
+
+  if (!setActorDataHP(actorData, half)) {
+    ui.notifications.warn(game.i18n.localize("FOUNDRY-WAR.warnings.splitImpossible"));
+    return;
+  }
+
+  const newActor = await Actor.create(actorData);
+  await setHP(actor, rest);
+
+  const tokenData = token.document.toObject();
+  delete tokenData._id;
+  delete tokenData.delta;
+  tokenData.actorId = newActor.id;
+  tokenData.actorLink = true;
+  tokenData.x = token.document.x + (canvas.scene.grid.size || 100);
+  tokenData.y = token.document.y;
+  tokenData.name = token.document.name;
+
+  await TokenDocument.create(tokenData, { parent: canvas.scene });
+
+  ui.notifications.info(
+    game.i18n.format("FOUNDRY-WAR.hud.splitDone", { name: token.document.name }),
+  );
+}
+
 Hooks.on("renderTokenHUD", (hud, html) => {
   const token = hud.object;
   if (!token?.actor) return;
 
   const column = html.querySelector?.(".col.left");
-  if (!column || html.querySelector(".foundry-war-hud")) return;
+  if (!column) return;
 
-  const targets = getTargetTokens(token);
-  const active = targets.every((target) => isTokenInWar(target));
+  if (!html.querySelector(".foundry-war-hud")) {
+    const targets = getTargetTokens(token);
+    const active = targets.every((target) => isTokenInWar(target));
 
-  const button = document.createElement("div");
-  button.className = `control-icon foundry-war-hud${active ? " active" : ""}`;
-  button.dataset.tooltip = game.i18n.localize(
-    active ? "FOUNDRY-WAR.hud.remove" : "FOUNDRY-WAR.hud.add",
-  );
-  button.innerHTML = '<i class="fa-solid fa-flag"></i>';
+    const button = document.createElement("div");
+    button.className = `control-icon foundry-war-hud${active ? " active" : ""}`;
+    button.dataset.tooltip = game.i18n.localize(
+      active ? "FOUNDRY-WAR.hud.remove" : "FOUNDRY-WAR.hud.add",
+    );
+    button.innerHTML = '<i class="fa-solid fa-flag"></i>';
 
-  button.addEventListener("click", async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    await toggleTokensInWar(targets);
-    await hud.render?.();
-  });
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await toggleTokensInWar(targets);
+      await hud.render?.();
+    });
 
-  column.append(button);
+    column.append(button);
+  }
+
+  if (!html.querySelector(".foundry-war-split")) {
+    const splitButton = document.createElement("div");
+    splitButton.className = "control-icon foundry-war-split";
+    splitButton.dataset.tooltip = game.i18n.localize("FOUNDRY-WAR.hud.split");
+    splitButton.innerHTML = '<i class="fa-solid fa-scissors"></i>';
+
+    splitButton.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await splitToken(token);
+      await hud.render?.();
+    });
+
+    column.append(splitButton);
+  }
 });

@@ -10,11 +10,11 @@ localizzazione e release automatica su GitHub.
 - Aggiunge **Guerra** al menu `⋯` di ogni scheda Attore (PG e PNG).
 - Il dialog di configurazione permette di scegliere:
   - **Squadra**: Alleato / Nemico
-  - **Tipo di truppa**: lista configurabile dalle impostazioni del modulo
+  - **Gruppo (classe)**: es. Comandante, con le sue abilità
 - I dati sono salvati nei flag dell'attore:
-  `actor.flags["foundry-war"].war = { team, troopType }`
-- La lista predefinita è `Fanteria, Cavalleria, Arcieri, Artiglieria, Mostro, Comandante`
-  e si modifica in `Configurazioni → Impostazioni modulo → Tipi di truppa`.
+  `actor.flags["foundry-war"].war = { team, group, abilities }`
+- I gruppi e le abilità si gestiscono dal pulsante **Gestione** nel menu `⋯`
+  della scheda (solo GM).
 - Comando chat `/war`: apre la configurazione per il token selezionato
   (o per il personaggio associato all'utente).
 - API per macro: `game.foundryWar.getWarData(actor)`,
@@ -27,8 +27,11 @@ localizzazione e release automatica su GitHub.
 - Click destro su un token → icona bandiera nel Token HUD:
   aggiunge o rimuove il token dal pannello. Con più token selezionati
   l'operazione vale per tutta la selezione.
+- Click destro su un token → icona **Split** (solo GM): dimezza le HP del token
+  e crea un token adiacente con la metà per difetto; il token originale tiene
+  l'eccesso.
 - Il pannello è diviso in **Alleati** (sinistra) e **Nemici** (destra) e mostra
-  per ogni unità token, CR, HP e tipo di truppa.
+  per ogni unità token, CR, HP e gruppo (classe).
 - Il **CR è modificabile a mano** con i pulsanti `−` / `+` su ogni card
   (parte dal CR dell'attore, minimo 0). Il valore manuale resta solo nel
   pannello e non tocca la scheda.
@@ -36,6 +39,29 @@ localizzazione e release automatica su GitHub.
   - **Comandante** → *Ispirazione da guerra*: +1 CR a tutte le unità dello
     stesso schieramento (attivo di default).
   - **Arciere** → *Attacco a distanza*: +2 CR a se stesso (attivo di default).
+### Classi e abilità
+
+- **Gestione** (menu `⋯` della scheda, solo GM) permette di creare, duplicare,
+  rinominare ed eliminare i gruppi.
+- Ogni gruppo ha un nome univoco e una lista di abilità. Ogni abilità ha nome,
+  tipo, valore e stato predefinito.
+- Tipi disponibili:
+  - **Taunt**: il doppio probabile di essere colpito
+  - **Resistente ai danni**: dimezza i danni subiti (passiva, non mostrata nel
+    pannello)
+  - **Buff alleati**: +CR a tutti gli alleati
+  - **Buff se stesso**: +CR a se stesso
+  - **Debuff nemici**: -CR a tutti i nemici
+  - **Lucky**: 1dN di riduzione del danno
+  - **Evasive**: metà probabile di perdere HP
+- I token salvano solo il **nome del gruppo**: modificando il gruppo cambiano
+  tutte le unità che lo usano.
+- Nel pannello guerra le abilità del gruppo compaiono come checkbox; Taunt,
+  Evasive e i buff sono attivi di default. Resistant è passiva.
+- I buff/debuff modificano il CR effettivo e quindi il grafico. Taunt, Evasive,
+  Resistant e Lucky modificano la distribuzione delle perdite per unità
+  (tabella e Applica).
+
 - **Flank / Accerchia** (uno per schieramento): bonus globale di +1 CR / +2 CR
   a tutte le unità di quel lato. Sono mutuamente esclusivi e si disattivano
   ricliccando.

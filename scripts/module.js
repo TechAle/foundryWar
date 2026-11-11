@@ -20,6 +20,8 @@ import {
   toggleWarPanel,
 } from "./war-panel.js";
 
+import { getGroups, openGroupManager } from "./war-groups.js";
+
 const MODULE_ID = "foundry-war";
 const STATE_KEY = "warState";
 
@@ -38,13 +40,11 @@ Hooks.once("init", () => {
     default: true,
   });
 
-  game.settings.register(MODULE_ID, "troopTypes", {
-    name: "FOUNDRY-WAR.settings.troopTypes.name",
-    hint: "FOUNDRY-WAR.settings.troopTypes.hint",
+  game.settings.register(MODULE_ID, "warGroups", {
     scope: "world",
-    config: true,
-    type: String,
-    default: "Fanteria, Cavalleria, Arcieri, Artiglieria, Mostro, Comandante",
+    config: false,
+    type: Object,
+    default: { groups: {} },
   });
 
   game.settings.register(MODULE_ID, "battleAlpha", {
@@ -113,6 +113,8 @@ Hooks.once("ready", () => {
     getPanelState: getWarState,
     setPanelState: commitWarState,
     toggleTokens: toggleTokensInWar,
+    openGroupManager,
+    getGroups,
   };
 
   // I client senza permessi di modifica delegano le scritture al GM.
@@ -155,8 +157,12 @@ Hooks.on("updateSetting", (setting) => {
     id === `${MODULE_ID}.${STATE_KEY}` ||
     key === `${MODULE_ID}.${STATE_KEY}` ||
     key === STATE_KEY;
+  const isWarGroups =
+    id === `${MODULE_ID}.warGroups` ||
+    key === `${MODULE_ID}.warGroups` ||
+    key === "warGroups";
 
-  if (isWarState) refreshWarPanel();
+  if (isWarState || isWarGroups) refreshWarPanel();
 });
 
 Hooks.on("updateActor", (_actor, changes) => {

@@ -1,14 +1,17 @@
 {
   "FOUNDRY-WAR": {
     "header": {
-      "war": "Guerra"
+      "war": "Guerra",
+      "manage": "Gestione"
     },
     "controls": {
       "togglePanel": "Mostra/nascondi pannello guerra"
     },
     "hud": {
       "add": "Aggiungi a Guerra",
-      "remove": "Rimuovi da Guerra"
+      "remove": "Rimuovi da Guerra",
+      "split": "Split",
+      "splitDone": "Token diviso: {name}."
     },
     "settings": {
       "enabled": {
@@ -48,6 +51,11 @@
         "hint": "I tipi di truppa si modificano dalle impostazioni del modulo.",
         "none": "— Nessuno —"
       },
+      "group": {
+        "name": "Gruppo",
+        "hint": "Le abilità del gruppo si attivano/disattivano nel pannello guerra.",
+        "none": "— Nessuno —"
+      },
       "save": "Salva",
       "cancel": "Annulla",
       "saved": "Configurazione guerra salvata per {name}."
@@ -62,6 +70,7 @@
       "crIncrease": "Aumenta CR",
       "hp": "Punti ferita",
       "type": "Tipo",
+      "group": "Gruppo",
       "remove": "Rimuovi dal pannello",
       "simulate": "Simula guerra",
       "flank": "Flank (+1 CR)",
@@ -72,6 +81,38 @@
     "effects": {
       "inspiration": "Ispirazione da guerra (+1 CR)",
       "ranged": "Attacco a distanza (+2 CR)"
+    },
+    "groups": {
+      "title": "Gestione classi",
+      "empty": "Nessun gruppo creato.",
+      "select": "Seleziona o crea un gruppo.",
+      "new": "Nuovo gruppo",
+      "newName": "Nuovo gruppo",
+      "copyPrefix": "Copia di",
+      "name": "Nome gruppo",
+      "abilityName": "Nome abilità",
+      "abilityType": "Tipo abilità",
+      "value": "Valore (CR o dado)",
+      "defaultActive": "Attiva di default",
+      "addAbility": "Aggiungi abilità",
+      "noAbilities": "Nessuna abilità.",
+      "save": "Salva",
+      "saved": "Gruppo salvato.",
+      "duplicate": "Duplica",
+      "delete": "Elimina",
+      "deleteConfirm": "Eliminare il gruppo {name}? I token che lo usano resteranno senza gruppo.",
+      "invalidName": "Il nome del gruppo non può essere vuoto.",
+      "duplicateName": "Esiste già un gruppo con questo nome.",
+      "gmOnly": "Solo il GM può gestire i gruppi.",
+      "type": {
+        "taunt": "Taunt",
+        "resistant": "Resistente ai danni",
+        "buffAllies": "Buff alleati (+CR)",
+        "buffSelf": "Buff se stesso (+CR)",
+        "debuffEnemies": "Debuff nemici (-CR)",
+        "lucky": "Lucky (1dN)",
+        "evasive": "Evasive"
+      }
     },
     "battle": {
       "title": "Battaglia",
@@ -114,7 +155,8 @@
     },
     "warnings": {
       "noActor": "Seleziona un token o apri la scheda di un attore.",
-      "noPermission": "Non hai i permessi per configurare questo attore."
+      "noPermission": "Non hai i permessi per configurare questo attore.",
+      "splitImpossible": "Servono almeno 2 HP per dividere il token."
     },
     "notifications": {
       "ready": "Foundry War caricato. Apri il menu ⋯ di un attore e scegli Guerra.",

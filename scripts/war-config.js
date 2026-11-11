@@ -1,34 +1,26 @@
 /**
  * Foundry War - configurazione "War" delle schede Attore.
  *
- * Aggiunge la voce "War" nel menu "⋯" delle schede (ActorSheetV2 e legacy)
- * e apre un dialog con:
- *  - squadra: alleato / nemica
- *  - tipo di truppa: lista configurabile dalle impostazioni del modulo
+ * Aggiunge le voci "Guerra" e "Gestione" nel menu "⋯" delle schede.
+ * "Guerra" apre la configurazione del token (squadra + gruppo);
+ * "Gestione" apre l'editor delle classi/abilità (solo GM).
  *
- * I dati vengono salvati nei flag dell'attore:
- *   actor.flags["foundry-war"].war = { team: "ally"|"enemy", troopType: "..." }
+ * I token salvano solo il riferimento al gruppo:
+ *   actor.flags["foundry-war"].war = { team, group, abilities }
  */
+
+import { getGroup, getGroups, openGroupManager } from "./war-groups.js";
+import { commitWarState, getWarState } from "./war-panel.js";
 
 const MODULE_ID = "foundry-war";
 const FLAG_KEY = "war";
 const ACTION_ID = "foundry-war-configure";
+const MANAGE_ACTION_ID = "foundry-war-manage";
 const TEAMS = ["ally", "enemy"];
 
 /* -------------------------------------------------------------------------- */
 /* Dati                                                                       */
 /* -------------------------------------------------------------------------- */
-
-/** Tipi di truppa configurati nelle impostazioni del modulo. */
-export function getTroopTypes() {
-  const raw = game.settings.get(MODULE_ID, "troopTypes") ?? "";
-  const types = raw
-    .split(",")
-    .map((type) => type.trim())
-    .filter(Boolean);
-
-  return [...new Set(types)];
-}
 
 /** Legge la configurazione War di un attore, con valori di default. */
 export function getWarData(actor) {
@@ -37,16 +29,38 @@ export function getWarData(actor) {
   return {
     team: TEAMS.includes(data.team) ? data.team : "ally",
     troopType: typeof data.troopType === "string" ? data.troopType : "",
+    group: typeof data.group === "string" ? data.group : "",
+    abilities:
+      data.abilities && typeof data.abilities === "object"
+        ? { ...data.abilities }
+        : {},
   };
 }
 
 /** Salva la configurazione War di un attore. */
-export async function setWarData(actor, { team, troopType }) {
+export async function setWarData(actor, { team, troopType, group }) {
   if (!actor) throw new Error(`${MODULE_ID}: attore mancante`);
+
+  const previous = getWarData(actor);
+  const nextGroup = getGroup(group);
+  const abilities = {};
+
+  if (nextGroup) {
+    for (const ability of nextGroup.abilities ?? []) {
+      const previousValue =
+        previous.group === nextGroup.name
+          ? previous.abilities?.[ability.id]
+          : undefined;
+
+      abilities[ability.id] = previousValue ?? ability.defaultActive;
+    }
+  }
 
   const data = {
     team: TEAMS.includes(team) ? team : "ally",
-    troopType: typeof troopType === "string" ? troopType : "",
+    troopType: typeof troopType === "string" ? troopType : previous.troopType,
+    group: nextGroup?.name ?? "",
+    abilities,
   };
 
   await actor.setFlag(MODULE_ID, FLAG_KEY, data);
@@ -70,19 +84,18 @@ export async function openWarConfig(actor) {
   }
 
   const current = getWarData(actor);
-  const troopTypes = getTroopTypes();
+  const groups = Object.keys(getGroups()).sort((a, b) => a.localeCompare(b));
 
-  // Se il tipo salvato non è più nella lista, lo mostriamo comunque.
-  if (current.troopType && !troopTypes.includes(current.troopType)) {
-    troopTypes.push(current.troopType);
+  if (current.group && !groups.includes(current.group)) {
+    groups.push(current.group);
   }
 
   const { escapeHTML } = foundry.utils;
 
-  const troopOptions = troopTypes
+  const groupOptions = groups
     .map(
-      (type) =>
-        `<option value="${escapeHTML(type)}"${type === current.troopType ? " selected" : ""}>${escapeHTML(type)}</option>`,
+      (name) =>
+        `<option value="${escapeHTML(name)}"${name === current.group ? " selected" : ""}>${escapeHTML(name)}</option>`,
     )
     .join("");
 
@@ -99,14 +112,14 @@ export async function openWarConfig(actor) {
       </div>
 
       <div class="form-group">
-        <label>${game.i18n.localize("FOUNDRY-WAR.dialog.troopType.name")}</label>
+        <label>${game.i18n.localize("FOUNDRY-WAR.dialog.group.name")}</label>
         <div class="form-fields">
-          <select name="troopType">
-            <option value="">${game.i18n.localize("FOUNDRY-WAR.dialog.troopType.none")}</option>
-            ${troopOptions}
+          <select name="group">
+            <option value="">${game.i18n.localize("FOUNDRY-WAR.dialog.group.none")}</option>
+            ${groupOptions}
           </select>
         </div>
-        <p class="hint">${game.i18n.localize("FOUNDRY-WAR.dialog.troopType.hint")}</p>
+        <p class="hint">${game.i18n.localize("FOUNDRY-WAR.dialog.group.hint")}</p>
       </div>
     </div>
   `;
@@ -127,7 +140,7 @@ export async function openWarConfig(actor) {
         default: true,
         callback: (_event, button) => ({
           team: button.form.elements.team.value,
-          troopType: button.form.elements.troopType.value,
+          group: button.form.elements.group.value,
         }),
       },
       {
@@ -142,6 +155,13 @@ export async function openWarConfig(actor) {
   if (!result) return;
 
   await setWarData(actor, result);
+
+  const state = getWarState();
+  await commitWarState({
+    ...state,
+    battle: { ...state.battle, roll: null },
+  });
+
   ui.notifications.info(
     game.i18n.format("FOUNDRY-WAR.dialog.saved", { name: actor.name }),
   );
@@ -153,19 +173,28 @@ export async function openWarConfig(actor) {
 
 Hooks.on("getHeaderControlsActorSheetV2", (app, controls) => {
   // L'array può essere riutilizzato: evitiamo voci duplicate.
-  if (controls.some((control) => control.action === ACTION_ID)) return;
+  if (!controls.some((control) => control.action === ACTION_ID)) {
+    controls.push({
+      action: ACTION_ID,
+      icon: "fa-solid fa-flag",
+      label: game.i18n.localize("FOUNDRY-WAR.header.war"),
+      ownership: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER,
+      // `this` è l'istanza della scheda quando Foundry invoca il controllo.
+      onClick: function () {
+        const actor = this?.document ?? this?.actor ?? app?.document ?? app?.actor;
+        openWarConfig(actor);
+      },
+    });
+  }
 
-  controls.push({
-    action: ACTION_ID,
-    icon: "fa-solid fa-flag",
-    label: game.i18n.localize("FOUNDRY-WAR.header.war"),
-    ownership: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER,
-    // `this` è l'istanza della scheda quando Foundry invoca il controllo.
-    onClick: function () {
-      const actor = this?.document ?? this?.actor ?? app?.document ?? app?.actor;
-      openWarConfig(actor);
-    },
-  });
+  if (game.user.isGM && !controls.some((control) => control.action === MANAGE_ACTION_ID)) {
+    controls.push({
+      action: MANAGE_ACTION_ID,
+      icon: "fa-solid fa-users-gear",
+      label: game.i18n.localize("FOUNDRY-WAR.header.manage"),
+      onClick: () => openGroupManager(),
+    });
+  }
 });
 
 /* -------------------------------------------------------------------------- */
@@ -173,12 +202,21 @@ Hooks.on("getHeaderControlsActorSheetV2", (app, controls) => {
 /* -------------------------------------------------------------------------- */
 
 Hooks.on("getActorSheetHeaderButtons", (app, buttons) => {
-  if (buttons.some((button) => button.class === "foundry-war-config")) return;
+  if (!buttons.some((button) => button.class === "foundry-war-config")) {
+    buttons.unshift({
+      class: "foundry-war-config",
+      label: game.i18n.localize("FOUNDRY-WAR.header.war"),
+      icon: "fas fa-flag",
+      onclick: () => openWarConfig(app.actor),
+    });
+  }
 
-  buttons.unshift({
-    class: "foundry-war-config",
-    label: game.i18n.localize("FOUNDRY-WAR.header.war"),
-    icon: "fas fa-flag",
-    onclick: () => openWarConfig(app.actor),
-  });
+  if (game.user.isGM && !buttons.some((button) => button.class === "foundry-war-manage")) {
+    buttons.push({
+      class: "foundry-war-manage",
+      label: game.i18n.localize("FOUNDRY-WAR.header.manage"),
+      icon: "fas fa-users-gear",
+      onclick: () => openGroupManager(),
+    });
+  }
 });

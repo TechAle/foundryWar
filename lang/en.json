@@ -1,14 +1,17 @@
 {
   "FOUNDRY-WAR": {
     "header": {
-      "war": "War"
+      "war": "War",
+      "manage": "Manage"
     },
     "controls": {
       "togglePanel": "Toggle War Panel"
     },
     "hud": {
       "add": "Add to War",
-      "remove": "Remove from War"
+      "remove": "Remove from War",
+      "split": "Split",
+      "splitDone": "Token split: {name}."
     },
     "settings": {
       "enabled": {
@@ -48,6 +51,11 @@
         "hint": "Troop types can be edited in the module settings.",
         "none": "— None —"
       },
+      "group": {
+        "name": "Group",
+        "hint": "Group abilities are enabled/disabled in the war panel.",
+        "none": "— None —"
+      },
       "save": "Save",
       "cancel": "Cancel",
       "saved": "War configuration saved for {name}."
@@ -62,6 +70,7 @@
       "crIncrease": "Increase CR",
       "hp": "Hit Points",
       "type": "Type",
+      "group": "Group",
       "remove": "Remove from panel",
       "simulate": "Simulate war",
       "flank": "Flank (+1 CR)",
@@ -72,6 +81,38 @@
     "effects": {
       "inspiration": "War inspiration (+1 CR)",
       "ranged": "Ranged attack (+2 CR)"
+    },
+    "groups": {
+      "title": "Class manager",
+      "empty": "No groups yet.",
+      "select": "Select or create a group.",
+      "new": "New group",
+      "newName": "New group",
+      "copyPrefix": "Copy of",
+      "name": "Group name",
+      "abilityName": "Ability name",
+      "abilityType": "Ability type",
+      "value": "Value (CR or die)",
+      "defaultActive": "Default active",
+      "addAbility": "Add ability",
+      "noAbilities": "No abilities.",
+      "save": "Save",
+      "saved": "Group saved.",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "deleteConfirm": "Delete group {name}? Tokens using it will lose their group.",
+      "invalidName": "Group name cannot be empty.",
+      "duplicateName": "A group with this name already exists.",
+      "gmOnly": "Only the GM can manage groups.",
+      "type": {
+        "taunt": "Taunt",
+        "resistant": "Damage resistant",
+        "buffAllies": "Buff allies (+CR)",
+        "buffSelf": "Buff self (+CR)",
+        "debuffEnemies": "Debuff enemies (-CR)",
+        "lucky": "Lucky (1dN)",
+        "evasive": "Evasive"
+      }
     },
     "battle": {
       "title": "Battle",
@@ -114,7 +155,8 @@
     },
     "warnings": {
       "noActor": "Select a token or open an actor sheet first.",
-      "noPermission": "You do not have permission to configure this actor."
+      "noPermission": "You do not have permission to configure this actor.",
+      "splitImpossible": "At least 2 HP are required to split the token."
     },
     "notifications": {
       "ready": "Foundry War loaded. Open an actor's ⋯ menu and choose War.",
