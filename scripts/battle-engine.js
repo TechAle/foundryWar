@@ -354,8 +354,7 @@ export function simulateDistribution(config, runs = 10000, seed = 0x1234abcd) {
   const results = [];
   const bins = new Map();
 
-  for (let i = 0; i < totalRuns; i++) {
-    const result = simulateBattle(config, rng);
+  function record(result) {
     results.push(result);
 
     const key = result.margin;
@@ -379,12 +378,34 @@ export function simulateDistribution(config, runs = 10000, seed = 0x1234abcd) {
     bin.enemySurvivors += result.enemies.survivors;
   }
 
+  // Con forze identiche il modello è simmetrico: per ogni battaglia registro
+  // anche l'esito speculare. Così 40 vs 40 dà esattamente 50/50 e la curva è
+  // simmetrica, senza rumore Monte Carlo.
+  const symmetric = alliesInitial > 0 && alliesInitial === enemiesInitial;
+
+  for (let i = 0; i < totalRuns; i++) {
+    const result = simulateBattle(config, rng);
+    record(result);
+
+    if (symmetric) {
+      record({
+        ...result,
+        winner:
+          result.winner === "ally" ? "enemy" : result.winner === "enemy" ? "ally" : "draw",
+        allies: { ...result.enemies },
+        enemies: { ...result.allies },
+        margin: -result.margin,
+      });
+    }
+  }
+
+  const samples = results.length;
   const allyWins = results.filter((result) => result.winner === "ally");
   const enemyWins = results.filter((result) => result.winner === "enemy");
-  const draws = totalRuns - allyWins.length - enemyWins.length;
+  const draws = samples - allyWins.length - enemyWins.length;
 
-  const allyWinRate = allyWins.length / totalRuns;
-  const enemyWinRate = enemyWins.length / totalRuns;
+  const allyWinRate = allyWins.length / samples;
+  const enemyWinRate = enemyWins.length / samples;
 
   let decisive = null;
   if (allyWinRate >= threshold) decisive = "ally";
@@ -395,7 +416,7 @@ export function simulateDistribution(config, runs = 10000, seed = 0x1234abcd) {
     .map((bin) => ({
       value: bin.value,
       count: bin.count,
-      probability: bin.count / totalRuns,
+      probability: bin.count / samples,
       avgAllyLosses: bin.allyLosses / bin.count,
       avgEnemyLosses: bin.enemyLosses / bin.count,
       avgAllySurvivors: bin.allySurvivors / bin.count,
@@ -404,13 +425,15 @@ export function simulateDistribution(config, runs = 10000, seed = 0x1234abcd) {
 
   return {
     runs: totalRuns,
+    samples,
+    symmetric,
     threshold,
     decisive,
     alliesInitial,
     enemiesInitial,
     allyWinRate,
     enemyWinRate,
-    drawRate: draws / totalRuns,
+    drawRate: draws / samples,
     average: averageResults(results),
     winAverage: {
       ally: averageResults(allyWins),
@@ -421,24 +444,26 @@ export function simulateDistribution(config, runs = 10000, seed = 0x1234abcd) {
   };
 }
 
-/** Probabilità complessiva di vittoria totale secondo la regola del margine. */
-export function totalVictoryProbability(distribution, threshold = 0.95) {
-  let total = 0;
+/** Probabilità di vittoria totale separata per lato. */
+export function totalVictoryRates(distribution, threshold = 0.95) {
+  let ally = 0;
+  let enemy = 0;
 
   for (const bin of distribution.bins) {
-    if (
-      isTotalVictory(
-        bin.value,
-        distribution.alliesInitial,
-        distribution.enemiesInitial,
-        threshold,
-      )
-    ) {
-      total += bin.probability;
+    if (bin.value > 0 && bin.value >= threshold * distribution.enemiesInitial) {
+      ally += bin.probability;
+    } else if (bin.value < 0 && -bin.value >= threshold * distribution.alliesInitial) {
+      enemy += bin.probability;
     }
   }
 
-  return total;
+  return { ally, enemy };
+}
+
+/** Probabilità complessiva di vittoria totale secondo la regola del margine. */
+export function totalVictoryProbability(distribution, threshold = 0.95) {
+  const rates = totalVictoryRates(distribution, threshold);
+  return rates.ally + rates.enemy;
 }
 
 /**

@@ -25,6 +25,7 @@ import {
   isTotalVictory,
   simulateDistribution,
   totalVictoryProbability,
+  totalVictoryRates,
   xpForCR,
 } from "../scripts/battle-engine.js";
 
@@ -130,8 +131,9 @@ console.log(`Pari:             ${pct(distribution.drawRate)}`);
 console.log(
   `Perdite medie:    alleati ${num(distribution.average?.allies.losses)} · nemici ${num(distribution.average?.enemies.losses)}`,
 );
+const totalRates = totalVictoryRates(distribution, totalThreshold);
 console.log(
-  `Vittoria totale:  ${pct(totalVictoryProbability(distribution, totalThreshold))}`,
+  `Vittoria totale:  alleati ${pct(totalRates.ally)} · nemici ${pct(totalRates.enemy)}`,
 );
 
 /* -------------------------------------------------------------------------- */
@@ -281,14 +283,12 @@ function buildReportHtml({ engineSource, initial, settings }) {
   }
   .roll-grid b { color: var(--text); font-weight: 600; }
   .zone-label {
-    fill: rgba(240,198,116,.75);
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: .6px;
+    letter-spacing: .4px;
     text-transform: uppercase;
   }
   .marker-label {
-    fill: #ffffff;
     font-size: 11px;
     font-weight: 700;
   }
@@ -390,8 +390,10 @@ function buildReportHtml({ engineSource, initial, settings }) {
     Tutto è in <b>truppe effettive</b>: truppe × XP(CR) / 50. Esempio: CR 1 = 4 truppe effettive,
     CR 2 = 9, CR 5 = 36. Asse X: truppe effettive alleate rimaste − nemiche (positivo = vantaggio alleato).
     Le linee delle perdite mostrano la perdita media <b>condizionata</b> a quell'esito.
-    La <b>zona dorata</b> è la vittoria totale: margine ≥ 95% delle truppe iniziali del perdente.
-    <b>Tira 0–100</b> estrae un esito dalla curva e disegna la linea verticale dove è uscito.
+    La <b>zona dorata a destra</b> è la vittoria totale alleati; la <b>zona rossa a sinistra</b>
+    è la vittoria totale nemici (sconfitta totale alleati). Soglia: margine ≥ 95% delle truppe
+    iniziali del perdente. <b>Tira 0–100</b> estrae un esito dalla curva e disegna la linea
+    verticale dove è uscito (dorata o rossa se è vittoria totale).
     Passa il mouse sul grafico per i valori esatti.
   </p>
 
@@ -407,7 +409,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
     createRng: createRng,
     effectiveTroops: effectiveTroops,
     isTotalVictory: isTotalVictory,
-    totalVictoryProbability: totalVictoryProbability
+    totalVictoryProbability: totalVictoryProbability,
+    totalVictoryRates: totalVictoryRates
   };
 })();
 </script>
@@ -602,42 +605,74 @@ function buildReportHtml({ engineSource, initial, settings }) {
       x1: xScale(0), x2: xScale(0), y1: M.top, y2: H - M.bottom
     }));
 
-    /* Zone di vittoria totale: margine >= 95% delle truppe del perdente */
+    /* Zone e soglie di vittoria totale */
     var posThreshold = THRESHOLD * distribution.enemiesInitial;
     var negThreshold = -THRESHOLD * distribution.alliesInitial;
 
-    function drawTotalZone(from, to) {
+    function fmtThreshold(value) {
+      return (value >= 0 ? "+" : "") +
+        value.toLocaleString("it-IT", { maximumFractionDigits: 1 });
+    }
+
+    function drawTotalZone(from, to, color) {
       var x1 = Math.max(M.left, xScale(Math.max(Math.min(from, to), xMin)));
       var x2 = Math.min(W - M.right, xScale(Math.min(Math.max(from, to), xMax)));
       if (x2 - x1 < 2) return;
 
       svg.appendChild(el("rect", {
         x: x1, y: M.top, width: x2 - x1, height: H - M.top - M.bottom,
-        fill: "#f0c674", opacity: "0.07"
+        fill: color, opacity: "0.08"
       }));
-
-      if (x2 - x1 > 70) {
-        var label = el("text", {
-          x: (x1 + x2) / 2, y: M.top + 14,
-          "text-anchor": "middle", "class": "zone-label"
-        });
-        label.textContent = "vittoria totale";
-        svg.appendChild(label);
-      }
     }
 
-    if (posThreshold < xMax) drawTotalZone(Math.max(posThreshold, xMin), xMax);
-    if (negThreshold > xMin) drawTotalZone(xMin, Math.min(negThreshold, xMax));
+    if (posThreshold < xMax) {
+      drawTotalZone(Math.max(posThreshold, xMin), xMax, "#f0c674");
+    }
+    if (negThreshold > xMin) {
+      drawTotalZone(xMin, Math.min(negThreshold, xMax), "#ff6b6b");
+    }
 
-    [posThreshold, negThreshold].forEach(function (boundary) {
+    function drawThreshold(boundary, color, text, defaultStart) {
       if (boundary <= xMin || boundary >= xMax) return;
+
+      var bx = xScale(boundary);
       svg.appendChild(el("line", {
-        x1: xScale(boundary), x2: xScale(boundary),
-        y1: M.top, y2: H - M.bottom,
-        stroke: "#f0c674", "stroke-width": "1",
-        "stroke-dasharray": "4 4", opacity: "0.55"
+        x1: bx, x2: bx, y1: M.top, y2: H - M.bottom,
+        stroke: color, "stroke-width": "1",
+        "stroke-dasharray": "4 4", opacity: "0.7"
       }));
-    });
+
+      var anchor = defaultStart ? "start" : "end";
+      var tx = bx + (defaultStart ? 6 : -6);
+
+      if (anchor === "start" && tx > W - M.right - 190) {
+        anchor = "end";
+        tx = bx - 6;
+      } else if (anchor === "end" && tx < M.left + 190) {
+        anchor = "start";
+        tx = bx + 6;
+      }
+
+      var label = el("text", {
+        x: tx, y: M.top + 14,
+        "text-anchor": anchor, "class": "zone-label", fill: color
+      });
+      label.textContent = text;
+      svg.appendChild(label);
+    }
+
+    drawThreshold(
+      posThreshold,
+      "#f0c674",
+      "Vittoria totale alleati ≥ " + fmtThreshold(posThreshold),
+      true,
+    );
+    drawThreshold(
+      negThreshold,
+      "#ff6b6b",
+      "Vittoria totale nemici ≤ " + fmtThreshold(negThreshold),
+      false,
+    );
 
     /* Probabilità: area + linea */
     var probPoints = bins.map(function (bin, idx) {
@@ -685,17 +720,21 @@ function buildReportHtml({ engineSource, initial, settings }) {
         distribution.enemiesInitial,
         THRESHOLD
       );
+      var totalSide = isTotalRoll ? (lastRoll.bin.value > 0 ? "ally" : "enemy") : null;
+      var markerColor =
+        totalSide === "ally" ? "#f0c674" : totalSide === "enemy" ? "#ff6b6b" : "#ffffff";
+
       var markerX = xScale(lastRoll.bin.value);
       svg.appendChild(el("line", {
         x1: markerX, x2: markerX, y1: M.top, y2: H - M.bottom,
-        stroke: isTotalRoll ? "#f0c674" : "#ffffff",
+        stroke: markerColor,
         "stroke-width": "2", "stroke-dasharray": "3 3"
       }));
       var markerLabel = el("text", {
         x: Math.min(markerX + 5, W - M.right - 70),
         y: M.top + 12,
         "class": "marker-label",
-        fill: isTotalRoll ? "#f0c674" : "#ffffff"
+        fill: markerColor
       });
       markerLabel.textContent = "Tiro " + (lastRoll.r * 100).toFixed(1);
       svg.appendChild(markerLabel);
@@ -777,9 +816,13 @@ function buildReportHtml({ engineSource, initial, settings }) {
         '<span style="color:var(--enemy)" title="nemici">N ' + avg.enemies.losses.toFixed(1) + '</span>'
       : "—";
 
-    var totalP = Engine.totalVictoryProbability(distribution, THRESHOLD);
-    els.totalChance.textContent = (totalP * 100).toFixed(1) + "%";
-    els.totalChance.style.color = totalP > 0 ? "var(--accent)" : "";
+    var rates = Engine.totalVictoryRates(distribution, THRESHOLD);
+    els.totalChance.innerHTML =
+      '<span style="color:var(--ally)" title="vittoria totale alleati">A ' +
+        (rates.ally * 100).toFixed(1) + '%</span>' +
+      ' <small>/</small> ' +
+      '<span style="color:var(--enemy)" title="vittoria totale nemici">N ' +
+        (rates.enemy * 100).toFixed(1) + '%</span>';
   }
 
   function recompute() {
@@ -832,8 +875,9 @@ function buildReportHtml({ engineSource, initial, settings }) {
         '<span>Perdite alleate</span><b style="color:var(--ally)">' + bin.avgAllyLosses.toFixed(1) + '</b>' +
         '<span>Perdite nemiche</span><b style="color:var(--enemy)">' + bin.avgEnemyLosses.toFixed(1) + '</b>' +
         '<span>Probabilità di questo esito</span><b>' + (bin.probability * 100).toFixed(2) + '%</b>' +
-        '<span>Vittoria totale</span><b style="color:' + (total ? "var(--accent)" : "var(--text)") + '">' +
-          (total ? "SÌ" : "NO") + '</b>' +
+        '<span>Vittoria totale</span><b style="color:' +
+          (total ? (margin > 0 ? "var(--accent)" : "var(--enemy)") : "var(--text)") + '">' +
+          (total ? "SÌ (" + (margin > 0 ? "alleati" : "nemici") + ")" : "NO") + '</b>' +
       '</div>';
   }
 

@@ -87,9 +87,14 @@ Il grafico ha due assi:
 - **destro**: perdite medie (linea verde = alleati, linea rossa = nemici)
 - **asse X**: truppe alleate rimaste − truppe nemiche rimaste
 
-La **zona dorata** sul grafico è la vittoria totale (margine ≥ soglia rispetto
-al perdente). Il marker del tiro è dorato se sei caduto nella zona, bianco
-altrimenti.
+Sul grafico:
+
+- **zona dorata a destra**: vittoria totale alleati
+  (margine ≥ soglia rispetto alle truppe iniziali nemiche)
+- **zona rossa a sinistra**: vittoria totale nemici, cioè sconfitta totale alleati
+- le due soglie sono disegnate come linee tratteggiate con il valore numerico
+- il marker del tiro è dorato (vittoria totale alleati), rosso (vittoria totale
+  nemici) o bianco (esito normale)
 
 Hover: probabilità, perdite medie e truppe medie in quel preciso esito.
 Sotto il grafico, il pannello del tiro mostra esito, perdite stimate e se è
@@ -113,4 +118,7 @@ open sim/out/report.html        # macOS
   **entrambi i lati dello stesso fattore**, così i rapporti restano identici ma
   la battaglia non dura decine di migliaia di round. Le perdite mostrate sono
   riportate alle truppe effettive reali.
+- Con forze effettive **identiche** il motore registra anche l'esito speculare
+  di ogni battaglia (antithetic sampling): 40 vs 40 dà esattamente 50/50 e una
+  curva simmetrica, senza rumore Monte Carlo.
 - `sim/out/` è generata e ignorata da git.
