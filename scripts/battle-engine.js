@@ -22,7 +22,8 @@
 export const MIN_XP = 50;
 export const SIGMA_MAX = 0.6;
 export const DEFAULT_ALPHA = 0.3;
-export const DEFAULT_BATTLE_SIGMA = 0.1;
+export const DEFAULT_BATTLE_SIGMA = 0.14;
+export const DEFAULT_TOTAL_THRESHOLD = 0.85;
 export const DEFAULT_DICE = 3;
 export const DEFAULT_LOSS_CAP = 0.5;
 export const DEFAULT_DECISIVE_THRESHOLD = 0.95;
@@ -137,15 +138,22 @@ export function effectiveTroops(battalions, bonus = 0) {
 
 /**
  * Una vittoria è "totale" quando il margine del vincitore è almeno
- * `threshold` (default 95%) delle truppe iniziali del perdente.
+ * `threshold` (default 85%) delle truppe iniziali del VINCITORE.
+ * In pratica: il vincitore conserva quasi tutto il suo esercito e il perdente
+ * viene travolto. Con 10:1 capita ~70%, con 2:1 quasi mai.
  */
-export function isTotalVictory(margin, alliesInitial, enemiesInitial, threshold = 0.95) {
+export function isTotalVictory(
+  margin,
+  alliesInitial,
+  enemiesInitial,
+  threshold = DEFAULT_TOTAL_THRESHOLD,
+) {
   if (!margin) return false;
 
-  const loserInitial = margin > 0 ? enemiesInitial : alliesInitial;
-  if (!loserInitial) return false;
+  const winnerInitial = margin > 0 ? alliesInitial : enemiesInitial;
+  if (!winnerInitial) return false;
 
-  return Math.abs(margin) >= threshold * loserInitial;
+  return Math.abs(margin) >= threshold * winnerInitial;
 }
 
 function buildSide(battalions, bonus, lossCap) {
@@ -452,14 +460,20 @@ export function simulateDistribution(config, runs = 10000, seed = 0x1234abcd) {
 }
 
 /** Probabilità di vittoria totale separata per lato. */
-export function totalVictoryRates(distribution, threshold = 0.95) {
+export function totalVictoryRates(
+  distribution,
+  threshold = DEFAULT_TOTAL_THRESHOLD,
+) {
   let ally = 0;
   let enemy = 0;
 
   for (const bin of distribution.bins) {
-    if (bin.value > 0 && bin.value >= threshold * distribution.enemiesInitial) {
+    if (bin.value > 0 && bin.value >= threshold * distribution.alliesInitial) {
       ally += bin.probability;
-    } else if (bin.value < 0 && -bin.value >= threshold * distribution.alliesInitial) {
+    } else if (
+      bin.value < 0 &&
+      -bin.value >= threshold * distribution.enemiesInitial
+    ) {
       enemy += bin.probability;
     }
   }
@@ -468,7 +482,10 @@ export function totalVictoryRates(distribution, threshold = 0.95) {
 }
 
 /** Probabilità complessiva di vittoria totale secondo la regola del margine. */
-export function totalVictoryProbability(distribution, threshold = 0.95) {
+export function totalVictoryProbability(
+  distribution,
+  threshold = DEFAULT_TOTAL_THRESHOLD,
+) {
   const rates = totalVictoryRates(distribution, threshold);
   return rates.ally + rates.enemy;
 }

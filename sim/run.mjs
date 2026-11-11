@@ -22,6 +22,7 @@ import {
   DEFAULT_BATTLE_SIGMA,
   DEFAULT_DICE,
   DEFAULT_LOSS_CAP,
+  DEFAULT_TOTAL_THRESHOLD,
   MIN_XP,
   isTotalVictory,
   simulateDistribution,
@@ -69,7 +70,7 @@ const alpha = Number(args.alpha ?? DEFAULT_ALPHA);
 const battleSigma = Number(args.battleSigma ?? DEFAULT_BATTLE_SIGMA);
 const rush = String(args.rush ?? "false") === "true";
 const lossCap = Number(args.lossCap ?? DEFAULT_LOSS_CAP);
-const totalThreshold = Number(args.totalThreshold ?? 0.95);
+const totalThreshold = Number(args.totalThreshold ?? DEFAULT_TOTAL_THRESHOLD);
 const dice = Number(args.dice ?? DEFAULT_DICE);
 const outPath = resolve(String(args.out ?? "sim/out/report.html"));
 
@@ -127,7 +128,7 @@ console.log(
 );
 console.log(
   `alpha=${alpha}  swing=${battleSigma}  rush=${rush}  lossCap=${lossCap}  dice=${dice}  ` +
-    `vittoria totale >= ${(totalThreshold * 100).toFixed(0)}% del perdente\n`,
+    `vittoria totale >= ${(totalThreshold * 100).toFixed(0)}% del vincitore\n`,
 );
 console.log(`Vittorie alleati: ${pct(distribution.allyWinRate)}`);
 console.log(`Vittorie nemici:  ${pct(distribution.enemyWinRate)}`);
@@ -327,7 +328,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     ${settings.runs.toLocaleString("it-IT")} battaglie per punto.
     alpha ${settings.alpha} · swing ${settings.battleSigma} · rush ${settings.rush ? "ON" : "OFF"} ·
     limite perdite ${settings.lossCap * 100}% ·
-    vittoria totale ≥ ${(settings.totalThreshold * 100).toFixed(0)}% del perdente
+    vittoria totale ≥ ${(settings.totalThreshold * 100).toFixed(0)}% del vincitore
   </p>
 
   <section class="panel controls">
@@ -352,8 +353,12 @@ function buildReportHtml({ engineSource, initial, settings }) {
       <input id="alpha" type="range" min="0" max="1" step="0.05" value="0.3">
     </div>
     <div class="control">
-      <div class="label"><span>Swing (imprevisto)</span><output id="swingOut">0.10</output></div>
-      <input id="swing" type="range" min="0" max="1" step="0.01" value="0.1">
+      <div class="label"><span>Swing (imprevisto)</span><output id="swingOut">0.14</output></div>
+      <input id="swing" type="range" min="0" max="1" step="0.01" value="0.14">
+    </div>
+    <div class="control">
+      <div class="label"><span>Soglia vittoria totale</span><output id="totalThresholdOut">85%</output></div>
+      <input id="totalThreshold" type="range" min="0.5" max="1" step="0.01" value="0.85">
     </div>
     <div class="control">
       <div class="label"><span>Rush</span></div>
@@ -375,7 +380,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     <div class="card panel">
       <div class="k">Vittoria totale</div>
       <div class="v" id="totalChance">—</div>
-      <div class="k" style="margin-top:4px">≥ ${(settings.totalThreshold * 100).toFixed(0)}% del perdente</div>
+      <div class="k" id="totalThresholdLabel" style="margin-top:4px">≥ ${(settings.totalThreshold * 100).toFixed(0)}% del vincitore</div>
     </div>
   </div>
 
@@ -399,11 +404,11 @@ function buildReportHtml({ engineSource, initial, settings }) {
     CR 2 = 9, CR 5 = 36. Asse X: truppe effettive alleate rimaste − nemiche (positivo = vantaggio alleato).
     Le linee delle perdite mostrano la perdita media <b>condizionata</b> a quell'esito.
     La <b>zona dorata a destra</b> è la vittoria totale alleati; la <b>zona rossa a sinistra</b>
-    è la vittoria totale nemici (sconfitta totale alleati). Soglia: margine ≥ 95% delle truppe
-    iniziali del perdente. <b>Tira 0–100</b> estrae un esito dalla curva e disegna la linea
+    è la vittoria totale nemici (sconfitta totale alleati). Soglia: margine ≥ 85% delle truppe
+    iniziali <b>del vincitore</b>. <b>Tira 0–100</b> estrae un esito dalla curva e disegna la linea
     verticale dove è uscito (dorata o rossa se è vittoria totale).
-    <b>Swing</b> è l'imprevisto di battaglia: a 0 i numeri dominano, a 0.10 un 2:1
-    vale circa 80/20. Passa il mouse sul grafico per i valori esatti.
+    <b>Swing</b> è l'imprevisto di battaglia: a 0 i numeri dominano; col default 0.14 un 2:1
+    vale circa 72/28 e un 5:1 circa 90/10. Passa il mouse sul grafico per i valori esatti.
   </p>
 
 <script>
@@ -443,6 +448,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     enemyCR: INITIAL.enemy.cr,
     alpha: INITIAL.settings.alpha,
     swing: INITIAL.settings.battleSigma,
+    totalThreshold: INITIAL.settings.totalThreshold,
     rush: INITIAL.settings.rush
   };
 
@@ -453,6 +459,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     enemyCR: document.getElementById("enemyCR"),
     alpha: document.getElementById("alpha"),
     swing: document.getElementById("swing"),
+    totalThreshold: document.getElementById("totalThreshold"),
     rush: document.getElementById("rush"),
     allyTroopsOut: document.getElementById("allyTroopsOut"),
     enemyTroopsOut: document.getElementById("enemyTroopsOut"),
@@ -460,6 +467,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
     enemyCROut: document.getElementById("enemyCROut"),
     alphaOut: document.getElementById("alphaOut"),
     swingOut: document.getElementById("swingOut"),
+    totalThresholdOut: document.getElementById("totalThresholdOut"),
+    totalThresholdLabel: document.getElementById("totalThresholdLabel"),
     allyWin: document.getElementById("allyWin"),
     enemyWin: document.getElementById("enemyWin"),
     avgLosses: document.getElementById("avgLosses"),
@@ -479,6 +488,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
   els.enemyCR.value = state.enemyCR;
   els.alpha.value = state.alpha;
   els.swing.value = state.swing;
+  els.totalThreshold.value = state.totalThreshold;
   els.rush.checked = state.rush;
 
   function fmtCR(value) {
@@ -498,6 +508,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     els.enemyCROut.textContent = fmtCR(state.enemyCR);
     els.alphaOut.textContent = Number(state.alpha).toFixed(2);
     els.swingOut.textContent = Number(state.swing).toFixed(2);
+    els.totalThresholdOut.textContent = Math.round(state.totalThreshold * 100) + "%";
   }
 
   function readState() {
@@ -507,6 +518,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
     state.enemyCR = Number(els.enemyCR.value);
     state.alpha = Number(els.alpha.value);
     state.swing = Number(els.swing.value);
+    state.totalThreshold = Number(els.totalThreshold.value);
+    THRESHOLD = state.totalThreshold;
     state.rush = els.rush.checked;
   }
 
@@ -621,9 +634,9 @@ function buildReportHtml({ engineSource, initial, settings }) {
       x1: xScale(0), x2: xScale(0), y1: M.top, y2: H - M.bottom
     }));
 
-    /* Zone e soglie di vittoria totale */
-    var posThreshold = THRESHOLD * distribution.enemiesInitial;
-    var negThreshold = -THRESHOLD * distribution.alliesInitial;
+    /* Zone e soglie di vittoria totale (base: truppe del vincitore) */
+    var posThreshold = THRESHOLD * distribution.alliesInitial;
+    var negThreshold = -THRESHOLD * distribution.enemiesInitial;
 
     function fmtThreshold(value) {
       return (value >= 0 ? "+" : "") +
@@ -833,6 +846,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
       : "—";
 
     var rates = Engine.totalVictoryRates(distribution, THRESHOLD);
+    els.totalThresholdLabel.textContent =
+      "≥ " + Math.round(THRESHOLD * 100) + "% del vincitore";
     els.totalChance.innerHTML =
       '<span style="color:var(--ally)" title="vittoria totale alleati">A ' +
         (rates.ally * 100).toFixed(1) + '%</span>' +
@@ -910,7 +925,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     timer = setTimeout(recompute, 90);
   }
 
-  ["allyTroops", "enemyTroops", "allyCR", "enemyCR", "alpha", "swing"].forEach(function (key) {
+  ["allyTroops", "enemyTroops", "allyCR", "enemyCR", "alpha", "swing", "totalThreshold"].forEach(function (key) {
     els[key].addEventListener("input", schedule);
   });
   els.rush.addEventListener("change", schedule);

@@ -23,7 +23,7 @@ Non richiede Foundry né dipendenze npm.
   fortuna/morale fisso per tutto lo scontro. Rende meno automatico il vantaggio
   numerico.
   - `0` → i numeri dominano (2:1 ≈ 99/1)
-  - `0.10` → default (2:1 ≈ 78/22)
+  - `0.14` → default (2:1 ≈ 71/29, 5:1 ≈ 89/11, 10:1 ≈ 96/4)
   - `0.5+` → molti upset, ma il lato con più truppe resta favorito
 - Chi perde il confronto perde 1 truppa.
 - `rush = false` limita le perdite cumulative al `lossCap` (default 50%): la
@@ -31,10 +31,12 @@ Non richiede Foundry né dipendenze npm.
   il limite si ritira.
 - `rush = true` rimuove il limite: si continua fino allo sterminio.
 - **Vittoria totale**: il margine del vincitore è ≥ `totalThreshold`
-  (default 95%) delle truppe iniziali del perdente. Non è un pre-check sulla
-  probabilità di vittoria: è una proprietà dell'esito estratto dal tiro.
-  - 1,8:1 → capita solo nelle code (~5%)
-  - 3:1 → praticamente sempre
+  (default 85%) delle truppe iniziali **del vincitore**. In pratica il vincitore
+  conserva quasi tutto il suo esercito e travolge il perdente. Non è un
+  pre-check sulla probabilità di vittoria: è una proprietà dell'esito.
+  - 2:1 → quasi mai
+  - 5:1 → rara
+  - 10:1 → circa 70%
 - Il tiro `0–100` è un percentile della curva: seleziona un esito con la sua
   probabilità e il suo margine.
 
@@ -48,7 +50,7 @@ node sim/run.mjs
 node sim/run.mjs --ally "1x10" --enemy "2x8" --runs 20000
 
 # rush e soglia vittoria totale
-node sim/run.mjs --ally "1x30" --enemy "1x10" --rush true --totalThreshold 0.95
+node sim/run.mjs --ally "1x30" --enemy "1x10" --rush true --totalThreshold 0.85
 
 # personalizza caos e limite perdite
 node sim/run.mjs --ally "1x16" --enemy "1x10" --alpha 0.5 --lossCap 0.4
@@ -65,10 +67,10 @@ Opzioni:
 | `--ally` / `--enemy` | `1x10` | valori iniziali degli slider |
 | `--runs` | `20000` | battaglie simulate (console); nel report max 8000 |
 | `--alpha` | `0.3` | caos per confronto (0–1) |
-| `--battleSigma` | `0.1` | swing/imprevisto di battaglia (0–2) |
+| `--battleSigma` | `0.14` | swing/imprevisto di battaglia (0–2) |
 | `--rush` | `false` | perdite illimitate iniziali |
 | `--lossCap` | `0.5` | limite perdite senza rush |
-| `--totalThreshold` | `0.95` | vittoria totale: margine / truppe iniziali del perdente |
+| `--totalThreshold` | `0.85` | vittoria totale: margine / truppe iniziali del vincitore |
 | `--dice` | `3` | truppe schierate per round |
 | `--seed` | `12345` | seed del RNG |
 | `--out` | `sim/out/report.html` | report HTML |
@@ -81,6 +83,7 @@ In `sim/out/report.html`:
 - **slider** per il CR dei due lati (0–20)
 - **slider** per alpha
 - **slider** per lo swing (imprevisto di battaglia)
+- **slider** per la soglia di vittoria totale
 - **checkbox** Rush
 - pulsante **Tira 0–100**: estrae un esito dalla curva (pesato sulle
   probabilità) e disegna la linea verticale dove è uscito
