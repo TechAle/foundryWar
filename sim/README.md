@@ -17,21 +17,22 @@ Non richiede Foundry né dipendenze npm.
 - Ogni confronto usa un jitter log-normale troncato a ±2σ.
 - `alpha` controlla il caos **per confronto**: `sigma = alpha × 0.6`.
   - `0` → deterministico
-  - `0.3` → default
+  - `0.15` → default
   - `1` → molto casuale
 - `forceCompression` ("compressione") riduce l'impatto del vantaggio numerico:
   le truppe effettive usate nella simulazione sono `truppe^(1 - compressione × 0.8)`.
   Più è alta, più truppe servono per ottenere lo stesso vantaggio.
   - `0` → nessuna compressione
+  - `0.2` → default
   - `0.5` → un 10:1 si comporta circa come un 5:1 (85/15)
   - `1` → compressione massima
 - `battleSigma` ("swing") è l'imprevisto **di battaglia**: un fattore di
   fortuna/morale fisso per tutto lo scontro. Rende meno automatico il vantaggio
   numerico.
   - `0` → i numeri dominano (2:1 ≈ 99/1)
-  - `0.12` → default (2:1 ≈ 75/25, 5:1 ≈ 93/7, 10:1 ≈ 98/2)
+  - `0.05` → default (2:1 ≈ 74/26, 5:1 ≈ 93/7, 10:1 ≈ 98/2)
     - 10 CR1 vs 10 CR2 → CR2 vince ~78%
-    - 10 CR1 vs 10 CR3 → CR3 vince ~88%
+    - 10 CR1 vs 10 CR3 → CR3 vince ~87%
   - `0.5+` → molti upset, ma il lato con più truppe resta favorito
 - Chi perde il confronto perde 1 truppa.
 - `rush = false` limita le perdite cumulative al `lossCap` (default 50%): la
@@ -39,7 +40,7 @@ Non richiede Foundry né dipendenze npm.
   il limite si ritira.
 - `rush = true` rimuove il limite: si continua fino allo sterminio.
 - **Vittoria totale**: il margine del vincitore è ≥ `totalThreshold`
-  (default 85%) delle truppe iniziali **del vincitore**. In pratica il vincitore
+  (default 80%) delle truppe iniziali **del vincitore**. In pratica il vincitore
   conserva quasi tutto il suo esercito e travolge il perdente. Non è un
   pre-check sulla probabilità di vittoria: è una proprietà dell'esito.
   - 2:1 → quasi mai
@@ -74,12 +75,12 @@ Opzioni:
 | --- | --- | --- |
 | `--ally` / `--enemy` | `1x10` | valori iniziali degli slider |
 | `--runs` | `20000` | battaglie simulate (console); nel report max 8000 |
-| `--alpha` | `0.3` | caos per confronto (0–1) |
-| `--battleSigma` | `0.12` | swing/imprevisto di battaglia (0–2) |
-| `--compression` | `0` | compressione forze: più alta = più truppe per un vantaggio (0–1) |
+| `--alpha` | `0.15` | caos per confronto (0–1) |
+| `--battleSigma` | `0.05` | swing/imprevisto di battaglia (0–2) |
+| `--compression` | `0.2` | compressione forze: più alta = più truppe per un vantaggio (0–1) |
 | `--rush` | `false` | perdite illimitate iniziali |
 | `--lossCap` | `0.5` | limite perdite senza rush |
-| `--totalThreshold` | `0.85` | vittoria totale: margine / truppe iniziali del vincitore |
+| `--totalThreshold` | `0.8` | vittoria totale: margine / truppe iniziali del vincitore |
 | `--dice` | `3` | truppe schierate per round |
 | `--seed` | `12345` | seed del RNG |
 | `--out` | `sim/out/report.html` | report HTML |

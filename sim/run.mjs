@@ -415,38 +415,38 @@ function buildReportHtml({ engineSource, initial, settings }) {
     <div class="control">
       <div class="label">
         <span>Alpha (caos)
-          <span class="help" tabindex="0" data-help="Caos per ogni singolo confronto. 0 = deterministico, 0.3 = default, 1 = molto casuale. Cambia le perdite, non chi vince.">?</span>
+          <span class="help" tabindex="0" data-help="Caos per ogni singolo confronto. 0 = deterministico, 0.15 = default, 1 = molto casuale. Cambia le perdite, non chi vince.">?</span>
         </span>
-        <output id="alphaOut">0.30</output>
+        <output id="alphaOut">0.15</output>
       </div>
-      <input id="alpha" type="range" min="0" max="1" step="0.05" value="0.3">
+      <input id="alpha" type="range" min="0" max="1" step="0.01" value="0.15">
     </div>
     <div class="control">
       <div class="label">
         <span>Swing (imprevisto)
-          <span class="help" tabindex="0" data-help="Imprevisto fisso per tutta la battaglia (morale, terreno, fortuna). Più è alto, meno contano i numeri. Default 0.12: 2:1 ≈ 75/25, 5:1 ≈ 93/7. CR1 vs CR2 ≈ 78/22, CR1 vs CR3 ≈ 88/12.">?</span>
+          <span class="help" tabindex="0" data-help="Imprevisto fisso per tutta la battaglia (morale, terreno, fortuna). Più è alto, meno contano i numeri. Default 0.05: 2:1 ≈ 74/26, 5:1 ≈ 93/7. CR1 vs CR2 ≈ 78/22, CR1 vs CR3 ≈ 87/13.">?</span>
         </span>
-        <output id="swingOut">0.12</output>
+        <output id="swingOut">0.05</output>
       </div>
-      <input id="swing" type="range" min="0" max="1" step="0.01" value="0.12">
+      <input id="swing" type="range" min="0" max="1" step="0.01" value="0.05">
     </div>
     <div class="control">
       <div class="label">
         <span>Soglia vittoria totale
-          <span class="help" tabindex="0" data-help="Il margine del vincitore deve raggiungere questa percentuale delle SUE truppe iniziali. Default 85%: 10:1 dà circa 70% di vittorie totali.">?</span>
+          <span class="help" tabindex="0" data-help="Il margine del vincitore deve raggiungere questa percentuale delle SUE truppe iniziali. Default 80%: 10:1 dà circa 79% di vittorie totali.">?</span>
         </span>
-        <output id="totalThresholdOut">85%</output>
+        <output id="totalThresholdOut">80%</output>
       </div>
-      <input id="totalThreshold" type="range" min="0.5" max="1" step="0.01" value="0.85">
+      <input id="totalThreshold" type="range" min="0.5" max="1" step="0.01" value="0.8">
     </div>
     <div class="control">
       <div class="label">
         <span>Compressione forze
-          <span class="help" tabindex="0" data-help="Comprime il vantaggio numerico: più è alta, più truppe servono per ottenere lo stesso vantaggio. 0 = nessuna compressione, 0.5 rende un 10:1 circa 84/16.">?</span>
+          <span class="help" tabindex="0" data-help="Comprime il vantaggio numerico: più è alta, più truppe servono per ottenere lo stesso vantaggio. Default 0.2; 0 = nessuna compressione.">?</span>
         </span>
-        <output id="compressionOut">0.00</output>
+        <output id="compressionOut">0.20</output>
       </div>
-      <input id="compression" type="range" min="0" max="1" step="0.01" value="0">
+      <input id="compression" type="range" min="0" max="1" step="0.01" value="0.2">
     </div>
     <div class="control">
       <div class="label">
@@ -525,9 +525,9 @@ function buildReportHtml({ engineSource, initial, settings }) {
     è la vittoria totale nemici (sconfitta totale alleati). Soglia: margine ≥ 85% delle truppe
     iniziali <b>del vincitore</b>. <b>Tira 0–100</b> estrae un esito dalla curva e disegna la linea
     verticale dove è uscito (dorata o rossa se è vittoria totale).
-    <b>Swing</b> è l'imprevisto di battaglia: a 0 i numeri dominano; col default 0.12 un 2:1
-    vale circa 75/25 e un 5:1 circa 93/7. <b>Compressione</b>: più è alta, più truppe
-    servono per ottenere lo stesso vantaggio (0 = off; 0.5 rende un 10:1 circa 85/15).
+    <b>Swing</b> è l'imprevisto di battaglia: a 0 i numeri dominano; col default 0.05 un 2:1
+    vale circa 74/26 e un 5:1 circa 93/7. <b>Compressione</b>: più è alta, più truppe
+    servono per ottenere lo stesso vantaggio (default 0.2; 0 = off).
     Passa il mouse sul grafico per i valori esatti.
   </p>
 
