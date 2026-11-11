@@ -21,6 +21,7 @@ import {
 } from "./war-panel.js";
 
 import { getGroups, openGroupManager } from "./war-groups.js";
+import { refreshEconomyPanel, toggleEconomyPanel } from "./economy.js";
 
 const MODULE_ID = "foundry-war";
 const STATE_KEY = "warState";
@@ -45,6 +46,13 @@ Hooks.once("init", () => {
     config: false,
     type: Object,
     default: { groups: {} },
+  });
+
+  game.settings.register(MODULE_ID, "economyState", {
+    scope: "world",
+    config: false,
+    type: Object,
+    default: {},
   });
 
   game.settings.register(MODULE_ID, "battleAlpha", {
@@ -115,13 +123,18 @@ Hooks.once("ready", () => {
     toggleTokens: toggleTokensInWar,
     openGroupManager,
     getGroups,
+    openEconomy: toggleEconomyPanel,
   };
 
   // I client senza permessi di modifica delegano le scritture al GM.
   game.socket.on(`module.${MODULE_ID}`, (payload) => {
     if (!game.user.isGM) return;
-    if (payload?.type !== "setWarState") return;
-    game.settings.set(MODULE_ID, STATE_KEY, payload.state);
+
+    if (payload?.type === "setWarState") {
+      game.settings.set(MODULE_ID, STATE_KEY, payload.state);
+    } else if (payload?.type === "setEconomyState") {
+      game.settings.set(MODULE_ID, "economyState", payload.state);
+    }
   });
 
   if (!game.settings.get(MODULE_ID, "enabled")) return;
@@ -145,6 +158,16 @@ Hooks.on("getSceneControlButtons", (controls) => {
     visible: true,
     onChange: () => toggleWarPanel(),
   };
+
+  tokenControls.tools["foundry-war-economy"] = {
+    name: "foundry-war-economy",
+    title: "FOUNDRY-WAR.economy.toggle",
+    icon: "fa-solid fa-coins",
+    order: Object.keys(tokenControls.tools).length,
+    button: true,
+    visible: true,
+    onChange: () => toggleEconomyPanel(),
+  };
 });
 
 /* -------------------------------------------------------------------------- */
@@ -161,8 +184,13 @@ Hooks.on("updateSetting", (setting) => {
     id === `${MODULE_ID}.warGroups` ||
     key === `${MODULE_ID}.warGroups` ||
     key === "warGroups";
+  const isEconomy =
+    id === `${MODULE_ID}.economyState` ||
+    key === `${MODULE_ID}.economyState` ||
+    key === "economyState";
 
   if (isWarState || isWarGroups) refreshWarPanel();
+  if (isEconomy) refreshEconomyPanel();
 });
 
 Hooks.on("updateActor", (_actor, changes) => {

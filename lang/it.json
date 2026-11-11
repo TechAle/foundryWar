@@ -4,6 +4,10 @@
       "war": "Guerra",
       "manage": "Gestione"
     },
+    "economy": {
+      "title": "Economia del Forte",
+      "toggle": "Economia"
+    },
     "controls": {
       "togglePanel": "Mostra/nascondi pannello guerra"
     },

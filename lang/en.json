@@ -4,6 +4,10 @@
       "war": "War",
       "manage": "Manage"
     },
+    "economy": {
+      "title": "Fort Economy",
+      "toggle": "Economy"
+    },
     "controls": {
       "togglePanel": "Toggle War Panel"
     },

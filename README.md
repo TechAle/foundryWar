@@ -39,6 +39,40 @@ localizzazione e release automatica su GitHub.
   - **Comandante** → *Ispirazione da guerra*: +1 CR a tutte le unità dello
     stesso schieramento (attivo di default).
   - **Arciere** → *Attacco a distanza*: +2 CR a se stesso (attivo di default).
+
+### Economia del Forte
+
+- Nei **Token Controls** (colonna sinistra della scena) c'è il tool
+  **Economia** (icona monete): apre il pannello con tutto il sistema
+  economico del forte.
+- Il pannello riporta:
+  - **Risorse**: Cibo, Legna, Minerali e Popolazione, con produzione,
+    consumo settimanale e tratte commerciali attive.
+  - **Infrastrutture e Danni**: stato di Ponte, Zone Limitrofe, Zone Interne e
+    Porto, con riparazione a costo di 1 Fortificazione.
+  - **Lavoratori**: assegnazione di Agricoltori, Taglialegna e Minatori.
+  - **Esercito e Difese**: soldati, equipaggiamento, cavalcature,
+    fortificazioni e macchine d'assalto, con arruolamento e congedo.
+  - **Mappe fortificazioni / macchine d'assalto**: assegnazione per sito
+    (massimo 1 fortificazione per sito).
+  - **Fabbrica e Cantiere**: produzione di equipaggiamento, cavalcature,
+    fortificazioni e macchine d'assalto, con annullamento dell'ultima
+    produzione.
+  - **Commercio multirisorsa**: invio/ricezione tra risorse, trattenuta,
+    cavalcatura, spedizioni singole o ripetitive.
+  - **Campagne e battaglie**: invio di soldati con costo del rancio e durata.
+  - **Gestione arbitraria**: modifiche manuali del GM o eventi eccezionali.
+  - **Registro del Forte**: tutti gli eventi, condivisi tra i client.
+- Spedizioni e battaglie arrivate diventano **in attesa**: il pannello mostra
+  gli input per inserire i **soldati tornati** (e, per le battaglie, il loot di
+  Cibo, Minerali e Legna) e il pulsante **Invia**. Finché ci sono eventi in
+  attesa, i pulsanti **+1 Giorno** e **+1 Settimana** restano bloccati: niente
+  più prompt bloccanti.
+- Lo stato è nella world setting `economyState`, quindi è condiviso in tempo
+  reale tra tutti i client (log compresi). I giocatori senza permessi di
+  modifica passano la richiesta al GM via socket.
+- API per macro: `game.foundryWar.openEconomy()`.
+
 ### Classi e abilità
 
 - **Gestione** (menu `⋯` della scheda, solo GM) permette di creare, duplicare,
