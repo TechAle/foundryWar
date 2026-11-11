@@ -20,10 +20,11 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_ALPHA,
   DEFAULT_DICE,
-  DEFAULT_DECISIVE_THRESHOLD,
   DEFAULT_LOSS_CAP,
   MIN_XP,
+  isTotalVictory,
   simulateDistribution,
+  totalVictoryProbability,
   xpForCR,
 } from "../scripts/battle-engine.js";
 
@@ -65,7 +66,7 @@ const interactiveRuns = Math.min(runs, 8000);
 const alpha = Number(args.alpha ?? DEFAULT_ALPHA);
 const rush = String(args.rush ?? "false") === "true";
 const lossCap = Number(args.lossCap ?? DEFAULT_LOSS_CAP);
-const threshold = Number(args.threshold ?? DEFAULT_DECISIVE_THRESHOLD);
+const totalThreshold = Number(args.totalThreshold ?? 0.95);
 const dice = Number(args.dice ?? DEFAULT_DICE);
 const outPath = resolve(String(args.out ?? "sim/out/report.html"));
 
@@ -89,7 +90,7 @@ const settings = {
   alpha,
   rush,
   lossCap,
-  threshold,
+  totalThreshold,
   dice,
   seed: Number(args.seed ?? 12345),
 };
@@ -105,7 +106,6 @@ const config = {
   rush,
   lossCap,
   dice,
-  decisiveThreshold: threshold,
 };
 
 const distribution = simulateDistribution(config, runs, settings.seed);
@@ -121,7 +121,8 @@ console.log(
     `Nemici: ${enemy.troops} truppe CR ${enemy.cr} (= ${effective(enemy)} truppe effettive)`,
 );
 console.log(
-  `alpha=${alpha}  rush=${rush}  lossCap=${lossCap}  dice=${dice}  soglia=${threshold}\n`,
+  `alpha=${alpha}  rush=${rush}  lossCap=${lossCap}  dice=${dice}  ` +
+    `vittoria totale >= ${(totalThreshold * 100).toFixed(0)}% del perdente\n`,
 );
 console.log(`Vittorie alleati: ${pct(distribution.allyWinRate)}`);
 console.log(`Vittorie nemici:  ${pct(distribution.enemyWinRate)}`);
@@ -130,7 +131,7 @@ console.log(
   `Perdite medie:    alleati ${num(distribution.average?.allies.losses)} · nemici ${num(distribution.average?.enemies.losses)}`,
 );
 console.log(
-  `Esito:            ${distribution.decisive ? `SCHIACCIANTE (${distribution.decisive === "ally" ? "alleati" : "nemici"})` : "—"}`,
+  `Vittoria totale:  ${pct(totalVictoryProbability(distribution, totalThreshold))}`,
 );
 
 /* -------------------------------------------------------------------------- */
@@ -247,6 +248,50 @@ function buildReportHtml({ engineSource, initial, settings }) {
     font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
     background: rgba(240,198,116,.15); color: var(--accent); border: 1px solid rgba(240,198,116,.4);
   }
+  .roll-btn {
+    padding: 8px 12px;
+    background: rgba(240,198,116,.14);
+    border: 1px solid rgba(240,198,116,.55);
+    color: var(--accent);
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .roll-btn:hover { background: rgba(240,198,116,.26); }
+  .roll-result {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .roll-result.total {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(240,198,116,.25);
+  }
+  .roll-head { color: var(--text); margin-bottom: 8px; }
+  .roll-head b { color: var(--accent); }
+  .roll-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 3px 18px;
+  }
+  .roll-grid b { color: var(--text); font-weight: 600; }
+  .zone-label {
+    fill: rgba(240,198,116,.75);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+  }
+  .marker-label {
+    fill: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+  }
   .chart-wrap { position: relative; padding: 8px 12px 0; }
   svg { display: block; width: 100%; height: auto; }
   .axis text { fill: var(--muted); font-size: 11px; }
@@ -277,7 +322,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
     Muovi gli slider: la curva viene ricalcolata in tempo reale con
     ${settings.runs.toLocaleString("it-IT")} battaglie per punto.
     alpha ${settings.alpha} · rush ${settings.rush ? "ON" : "OFF"} ·
-    limite perdite ${settings.lossCap * 100}% · soglia schiacciante ${settings.threshold * 100}%
+    limite perdite ${settings.lossCap * 100}% ·
+    vittoria totale ≥ ${(settings.totalThreshold * 100).toFixed(0)}% del perdente
   </p>
 
   <section class="panel controls">
@@ -305,6 +351,12 @@ function buildReportHtml({ engineSource, initial, settings }) {
       <div class="label"><span>Rush</span></div>
       <label class="inline"><input id="rush" type="checkbox"> perdite illimitate</label>
     </div>
+    <div class="control">
+      <div class="label"><span>Tiro dell'esito</span></div>
+      <button id="rollBtn" class="roll-btn" type="button">
+        <i>🎲</i> Tira 0–100
+      </button>
+    </div>
   </section>
 
   <div class="cards">
@@ -312,7 +364,15 @@ function buildReportHtml({ engineSource, initial, settings }) {
     <div class="card panel"><div class="k">Vittoria nemici</div><div class="v" id="enemyWin">—</div></div>
     <div class="card panel"><div class="k">Perdite medie (eff.)</div><div class="v" id="avgLosses">—</div></div>
     <div class="card panel"><div class="k">Truppe effettive</div><div class="v" id="effective">—</div></div>
-    <div class="card panel"><div class="k">Esito</div><div class="v" id="decisive">—</div></div>
+    <div class="card panel">
+      <div class="k">Vittoria totale</div>
+      <div class="v" id="totalChance">—</div>
+      <div class="k" style="margin-top:4px">≥ ${(settings.totalThreshold * 100).toFixed(0)}% del perdente</div>
+    </div>
+  </div>
+
+  <div class="roll-result" id="rollResult">
+    Premi <b>Tira 0–100</b> per estrarre un esito dalla curva.
   </div>
 
   <div class="panel chart-wrap">
@@ -330,6 +390,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
     Tutto è in <b>truppe effettive</b>: truppe × XP(CR) / 50. Esempio: CR 1 = 4 truppe effettive,
     CR 2 = 9, CR 5 = 36. Asse X: truppe effettive alleate rimaste − nemiche (positivo = vantaggio alleato).
     Le linee delle perdite mostrano la perdita media <b>condizionata</b> a quell'esito.
+    La <b>zona dorata</b> è la vittoria totale: margine ≥ 95% delle truppe iniziali del perdente.
+    <b>Tira 0–100</b> estrae un esito dalla curva e disegna la linea verticale dove è uscito.
     Passa il mouse sul grafico per i valori esatti.
   </p>
 
@@ -342,7 +404,10 @@ function buildReportHtml({ engineSource, initial, settings }) {
     simulateBattle: simulateBattle,
     simulateDistribution: simulateDistribution,
     resolveBattle: resolveBattle,
-    createRng: createRng
+    createRng: createRng,
+    effectiveTroops: effectiveTroops,
+    isTotalVictory: isTotalVictory,
+    totalVictoryProbability: totalVictoryProbability
   };
 })();
 </script>
@@ -355,6 +420,9 @@ function buildReportHtml({ engineSource, initial, settings }) {
   var INITIAL = ${JSON.stringify({ ally: initial.ally, enemy: initial.enemy, settings })};
   var RUNS = INITIAL.settings.runs;
   var SEED = INITIAL.settings.seed;
+  var THRESHOLD = INITIAL.settings.totalThreshold;
+  var lastDistribution = null;
+  var lastRoll = null;
 
   var state = {
     allyTroops: INITIAL.ally.troops,
@@ -381,7 +449,9 @@ function buildReportHtml({ engineSource, initial, settings }) {
     enemyWin: document.getElementById("enemyWin"),
     avgLosses: document.getElementById("avgLosses"),
     effectiveOut: document.getElementById("effective"),
-    decisive: document.getElementById("decisive"),
+    totalChance: document.getElementById("totalChance"),
+    rollBtn: document.getElementById("rollBtn"),
+    rollResult: document.getElementById("rollResult"),
     status: document.getElementById("status"),
     svg: document.getElementById("chart"),
     tooltip: document.getElementById("tooltip")
@@ -429,8 +499,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
       alpha: state.alpha,
       rush: state.rush,
       lossCap: INITIAL.settings.lossCap,
-      dice: INITIAL.settings.dice,
-      decisiveThreshold: INITIAL.settings.threshold
+      dice: INITIAL.settings.dice
     };
   }
 
@@ -533,6 +602,43 @@ function buildReportHtml({ engineSource, initial, settings }) {
       x1: xScale(0), x2: xScale(0), y1: M.top, y2: H - M.bottom
     }));
 
+    /* Zone di vittoria totale: margine >= 95% delle truppe del perdente */
+    var posThreshold = THRESHOLD * distribution.enemiesInitial;
+    var negThreshold = -THRESHOLD * distribution.alliesInitial;
+
+    function drawTotalZone(from, to) {
+      var x1 = Math.max(M.left, xScale(Math.max(Math.min(from, to), xMin)));
+      var x2 = Math.min(W - M.right, xScale(Math.min(Math.max(from, to), xMax)));
+      if (x2 - x1 < 2) return;
+
+      svg.appendChild(el("rect", {
+        x: x1, y: M.top, width: x2 - x1, height: H - M.top - M.bottom,
+        fill: "#f0c674", opacity: "0.07"
+      }));
+
+      if (x2 - x1 > 70) {
+        var label = el("text", {
+          x: (x1 + x2) / 2, y: M.top + 14,
+          "text-anchor": "middle", "class": "zone-label"
+        });
+        label.textContent = "vittoria totale";
+        svg.appendChild(label);
+      }
+    }
+
+    if (posThreshold < xMax) drawTotalZone(Math.max(posThreshold, xMin), xMax);
+    if (negThreshold > xMin) drawTotalZone(xMin, Math.min(negThreshold, xMax));
+
+    [posThreshold, negThreshold].forEach(function (boundary) {
+      if (boundary <= xMin || boundary >= xMax) return;
+      svg.appendChild(el("line", {
+        x1: xScale(boundary), x2: xScale(boundary),
+        y1: M.top, y2: H - M.bottom,
+        stroke: "#f0c674", "stroke-width": "1",
+        "stroke-dasharray": "4 4", opacity: "0.55"
+      }));
+    });
+
     /* Probabilità: area + linea */
     var probPoints = bins.map(function (bin, idx) {
       return [xScale(bin.value), yProb(probValues[idx])];
@@ -570,6 +676,30 @@ function buildReportHtml({ engineSource, initial, settings }) {
 
     lossLine("avgAllyLosses", "var(--ally)");
     lossLine("avgEnemyLosses", "var(--enemy)");
+
+    /* Marker del tiro */
+    if (lastRoll) {
+      var isTotalRoll = Engine.isTotalVictory(
+        lastRoll.bin.value,
+        distribution.alliesInitial,
+        distribution.enemiesInitial,
+        THRESHOLD
+      );
+      var markerX = xScale(lastRoll.bin.value);
+      svg.appendChild(el("line", {
+        x1: markerX, x2: markerX, y1: M.top, y2: H - M.bottom,
+        stroke: isTotalRoll ? "#f0c674" : "#ffffff",
+        "stroke-width": "2", "stroke-dasharray": "3 3"
+      }));
+      var markerLabel = el("text", {
+        x: Math.min(markerX + 5, W - M.right - 70),
+        y: M.top + 12,
+        "class": "marker-label",
+        fill: isTotalRoll ? "#f0c674" : "#ffffff"
+      });
+      markerLabel.textContent = "Tiro " + (lastRoll.r * 100).toFixed(1);
+      svg.appendChild(markerLabel);
+    }
 
     /* Hover */
     var hoverLine = el("line", {
@@ -647,23 +777,64 @@ function buildReportHtml({ engineSource, initial, settings }) {
         '<span style="color:var(--enemy)" title="nemici">N ' + avg.enemies.losses.toFixed(1) + '</span>'
       : "—";
 
-    if (distribution.decisive) {
-      els.decisive.innerHTML =
-        '<span class="badge">' +
-        (distribution.decisive === "ally" ? "Schiacciante alleati" : "Schiacciante nemici") +
-        '</span>';
-    } else {
-      els.decisive.textContent = "—";
-    }
+    var totalP = Engine.totalVictoryProbability(distribution, THRESHOLD);
+    els.totalChance.textContent = (totalP * 100).toFixed(1) + "%";
+    els.totalChance.style.color = totalP > 0 ? "var(--accent)" : "";
   }
 
   function recompute() {
     var distribution = Engine.simulateDistribution(configFromState(), RUNS, SEED);
+    lastDistribution = distribution;
     updateCards(distribution);
     render(distribution);
     els.status.textContent =
       "Aggiornato: " + state.allyTroops + " vs " + state.enemyTroops +
       " truppe · " + RUNS.toLocaleString("it-IT") + " battaglie";
+  }
+
+  function doRoll() {
+    if (!lastDistribution || !lastDistribution.bins.length) return;
+
+    var r = Math.random();
+    var acc = 0;
+    var bin = lastDistribution.bins[lastDistribution.bins.length - 1];
+
+    for (var i = 0; i < lastDistribution.bins.length; i++) {
+      acc += lastDistribution.bins[i].probability;
+      if (r <= acc) {
+        bin = lastDistribution.bins[i];
+        break;
+      }
+    }
+
+    lastRoll = { r: r, bin: bin };
+    render(lastDistribution);
+    showRollResult(lastDistribution, lastRoll);
+  }
+
+  function showRollResult(distribution, roll) {
+    var bin = roll.bin;
+    var margin = bin.value;
+    var winner = margin > 0 ? "Alleati" : margin < 0 ? "Nemici" : "Pareggio";
+    var total = Engine.isTotalVictory(
+      margin,
+      distribution.alliesInitial,
+      distribution.enemiesInitial,
+      THRESHOLD
+    );
+
+    els.rollResult.className = "roll-result" + (total ? " total" : "");
+    els.rollResult.innerHTML =
+      '<div class="roll-head">Tiro <b>' + (roll.r * 100).toFixed(1) + '</b> / 100 → ' +
+        'margine <b>' + (margin > 0 ? "+" : "") + margin.toLocaleString("it-IT") + '</b></div>' +
+      '<div class="roll-grid">' +
+        '<span>Esito</span><b>' + winner + '</b>' +
+        '<span>Perdite alleate</span><b style="color:var(--ally)">' + bin.avgAllyLosses.toFixed(1) + '</b>' +
+        '<span>Perdite nemiche</span><b style="color:var(--enemy)">' + bin.avgEnemyLosses.toFixed(1) + '</b>' +
+        '<span>Probabilità di questo esito</span><b>' + (bin.probability * 100).toFixed(2) + '%</b>' +
+        '<span>Vittoria totale</span><b style="color:' + (total ? "var(--accent)" : "var(--text)") + '">' +
+          (total ? "SÌ" : "NO") + '</b>' +
+      '</div>';
   }
 
   var timer = null;
@@ -672,6 +843,9 @@ function buildReportHtml({ engineSource, initial, settings }) {
     readState();
     syncOutputs();
     els.status.textContent = "Calcolo…";
+    lastRoll = null;
+    els.rollResult.className = "roll-result";
+    els.rollResult.innerHTML = "Premi <b>Tira 0–100</b> per estrarre un esito dalla curva.";
     clearTimeout(timer);
     timer = setTimeout(recompute, 90);
   }
@@ -680,6 +854,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     els[key].addEventListener("input", schedule);
   });
   els.rush.addEventListener("change", schedule);
+  els.rollBtn.addEventListener("click", doRoll);
 
   syncOutputs();
   recompute();

@@ -122,6 +122,31 @@ function truncatedNormal(rng, limit = 2) {
  * Ogni truppa effettiva vale 1: il vantaggio di un CR alto è tutto nel numero
  * di truppe effettive (la curva XP 5e resta non lineare).
  */
+export function effectiveTroops(battalions, bonus = 0) {
+  let total = 0;
+
+  for (const battalion of battalions ?? []) {
+    const cr = Math.max(0, Number(battalion.cr ?? 0) + Number(bonus ?? 0));
+    const count = Math.max(0, Math.floor(Number(battalion.troops ?? 0)));
+    total += Math.floor((count * xpForCR(cr)) / MIN_XP);
+  }
+
+  return total;
+}
+
+/**
+ * Una vittoria è "totale" quando il margine del vincitore è almeno
+ * `threshold` (default 95%) delle truppe iniziali del perdente.
+ */
+export function isTotalVictory(margin, alliesInitial, enemiesInitial, threshold = 0.95) {
+  if (!margin) return false;
+
+  const loserInitial = margin > 0 ? enemiesInitial : alliesInitial;
+  if (!loserInitial) return false;
+
+  return Math.abs(margin) >= threshold * loserInitial;
+}
+
 function buildSide(battalions, bonus, lossCap) {
   let effective = 0;
   let raw = 0;
@@ -317,6 +342,8 @@ function averageResults(results) {
  */
 export function simulateDistribution(config, runs = 10000, seed = 0x1234abcd) {
   const totalRuns = Math.max(1, Math.floor(runs));
+  const alliesInitial = effectiveTroops(config.allies, config.allyBonus);
+  const enemiesInitial = effectiveTroops(config.enemies, config.enemyBonus);
   const threshold = clamp(
     Number(config.decisiveThreshold ?? DEFAULT_DECISIVE_THRESHOLD),
     0.5,
@@ -379,6 +406,8 @@ export function simulateDistribution(config, runs = 10000, seed = 0x1234abcd) {
     runs: totalRuns,
     threshold,
     decisive,
+    alliesInitial,
+    enemiesInitial,
     allyWinRate,
     enemyWinRate,
     drawRate: draws / totalRuns,
@@ -390,6 +419,26 @@ export function simulateDistribution(config, runs = 10000, seed = 0x1234abcd) {
     bins: distributionBins,
     config,
   };
+}
+
+/** Probabilità complessiva di vittoria totale secondo la regola del margine. */
+export function totalVictoryProbability(distribution, threshold = 0.95) {
+  let total = 0;
+
+  for (const bin of distribution.bins) {
+    if (
+      isTotalVictory(
+        bin.value,
+        distribution.alliesInitial,
+        distribution.enemiesInitial,
+        threshold,
+      )
+    ) {
+      total += bin.probability;
+    }
+  }
+
+  return total;
 }
 
 /**
