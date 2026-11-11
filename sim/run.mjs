@@ -19,6 +19,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   DEFAULT_ALPHA,
+  DEFAULT_BATTLE_SIGMA,
   DEFAULT_DICE,
   DEFAULT_LOSS_CAP,
   MIN_XP,
@@ -65,6 +66,7 @@ const args = parseArgs(process.argv);
 const runs = Math.max(1, Math.floor(Number(args.runs ?? 20000)));
 const interactiveRuns = Math.min(runs, 8000);
 const alpha = Number(args.alpha ?? DEFAULT_ALPHA);
+const battleSigma = Number(args.battleSigma ?? DEFAULT_BATTLE_SIGMA);
 const rush = String(args.rush ?? "false") === "true";
 const lossCap = Number(args.lossCap ?? DEFAULT_LOSS_CAP);
 const totalThreshold = Number(args.totalThreshold ?? 0.95);
@@ -89,6 +91,7 @@ const enemy = initialBattalion(args.enemy, 1, 10);
 const settings = {
   runs: interactiveRuns,
   alpha,
+  battleSigma,
   rush,
   lossCap,
   totalThreshold,
@@ -104,6 +107,7 @@ const config = {
   allies: [{ cr: ally.cr, troops: ally.troops }],
   enemies: [{ cr: enemy.cr, troops: enemy.troops }],
   alpha,
+  battleSigma,
   rush,
   lossCap,
   dice,
@@ -122,7 +126,7 @@ console.log(
     `Nemici: ${enemy.troops} truppe CR ${enemy.cr} (= ${effective(enemy)} truppe effettive)`,
 );
 console.log(
-  `alpha=${alpha}  rush=${rush}  lossCap=${lossCap}  dice=${dice}  ` +
+  `alpha=${alpha}  swing=${battleSigma}  rush=${rush}  lossCap=${lossCap}  dice=${dice}  ` +
     `vittoria totale >= ${(totalThreshold * 100).toFixed(0)}% del perdente\n`,
 );
 console.log(`Vittorie alleati: ${pct(distribution.allyWinRate)}`);
@@ -321,7 +325,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
   <p class="sub">
     Muovi gli slider: la curva viene ricalcolata in tempo reale con
     ${settings.runs.toLocaleString("it-IT")} battaglie per punto.
-    alpha ${settings.alpha} · rush ${settings.rush ? "ON" : "OFF"} ·
+    alpha ${settings.alpha} · swing ${settings.battleSigma} · rush ${settings.rush ? "ON" : "OFF"} ·
     limite perdite ${settings.lossCap * 100}% ·
     vittoria totale ≥ ${(settings.totalThreshold * 100).toFixed(0)}% del perdente
   </p>
@@ -346,6 +350,10 @@ function buildReportHtml({ engineSource, initial, settings }) {
     <div class="control">
       <div class="label"><span>Alpha (caos)</span><output id="alphaOut">0.30</output></div>
       <input id="alpha" type="range" min="0" max="1" step="0.05" value="0.3">
+    </div>
+    <div class="control">
+      <div class="label"><span>Swing (imprevisto)</span><output id="swingOut">0.10</output></div>
+      <input id="swing" type="range" min="0" max="1" step="0.01" value="0.1">
     </div>
     <div class="control">
       <div class="label"><span>Rush</span></div>
@@ -394,7 +402,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
     è la vittoria totale nemici (sconfitta totale alleati). Soglia: margine ≥ 95% delle truppe
     iniziali del perdente. <b>Tira 0–100</b> estrae un esito dalla curva e disegna la linea
     verticale dove è uscito (dorata o rossa se è vittoria totale).
-    Passa il mouse sul grafico per i valori esatti.
+    <b>Swing</b> è l'imprevisto di battaglia: a 0 i numeri dominano, a 0.10 un 2:1
+    vale circa 80/20. Passa il mouse sul grafico per i valori esatti.
   </p>
 
 <script>
@@ -433,6 +442,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     allyCR: INITIAL.ally.cr,
     enemyCR: INITIAL.enemy.cr,
     alpha: INITIAL.settings.alpha,
+    swing: INITIAL.settings.battleSigma,
     rush: INITIAL.settings.rush
   };
 
@@ -442,12 +452,14 @@ function buildReportHtml({ engineSource, initial, settings }) {
     allyCR: document.getElementById("allyCR"),
     enemyCR: document.getElementById("enemyCR"),
     alpha: document.getElementById("alpha"),
+    swing: document.getElementById("swing"),
     rush: document.getElementById("rush"),
     allyTroopsOut: document.getElementById("allyTroopsOut"),
     enemyTroopsOut: document.getElementById("enemyTroopsOut"),
     allyCROut: document.getElementById("allyCROut"),
     enemyCROut: document.getElementById("enemyCROut"),
     alphaOut: document.getElementById("alphaOut"),
+    swingOut: document.getElementById("swingOut"),
     allyWin: document.getElementById("allyWin"),
     enemyWin: document.getElementById("enemyWin"),
     avgLosses: document.getElementById("avgLosses"),
@@ -466,6 +478,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
   els.allyCR.value = state.allyCR;
   els.enemyCR.value = state.enemyCR;
   els.alpha.value = state.alpha;
+  els.swing.value = state.swing;
   els.rush.checked = state.rush;
 
   function fmtCR(value) {
@@ -484,6 +497,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     els.allyCROut.textContent = fmtCR(state.allyCR);
     els.enemyCROut.textContent = fmtCR(state.enemyCR);
     els.alphaOut.textContent = Number(state.alpha).toFixed(2);
+    els.swingOut.textContent = Number(state.swing).toFixed(2);
   }
 
   function readState() {
@@ -492,6 +506,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     state.allyCR = Number(els.allyCR.value);
     state.enemyCR = Number(els.enemyCR.value);
     state.alpha = Number(els.alpha.value);
+    state.swing = Number(els.swing.value);
     state.rush = els.rush.checked;
   }
 
@@ -500,6 +515,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
       allies: [{ cr: state.allyCR, troops: state.allyTroops }],
       enemies: [{ cr: state.enemyCR, troops: state.enemyTroops }],
       alpha: state.alpha,
+      battleSigma: state.swing,
       rush: state.rush,
       lossCap: INITIAL.settings.lossCap,
       dice: INITIAL.settings.dice
@@ -894,7 +910,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     timer = setTimeout(recompute, 90);
   }
 
-  ["allyTroops", "enemyTroops", "allyCR", "enemyCR", "alpha"].forEach(function (key) {
+  ["allyTroops", "enemyTroops", "allyCR", "enemyCR", "alpha", "swing"].forEach(function (key) {
     els[key].addEventListener("input", schedule);
   });
   els.rush.addEventListener("change", schedule);

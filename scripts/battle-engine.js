@@ -22,6 +22,7 @@
 export const MIN_XP = 50;
 export const SIGMA_MAX = 0.6;
 export const DEFAULT_ALPHA = 0.3;
+export const DEFAULT_BATTLE_SIGMA = 0.1;
 export const DEFAULT_DICE = 3;
 export const DEFAULT_LOSS_CAP = 0.5;
 export const DEFAULT_DECISIVE_THRESHOLD = 0.95;
@@ -231,6 +232,7 @@ function realSide(simSide, original, scale) {
 export function simulateBattle(config, rng) {
   const alpha = clamp(Number(config.alpha ?? DEFAULT_ALPHA), 0, 1);
   const sigma = alpha * SIGMA_MAX;
+  const battleSigma = clamp(Number(config.battleSigma ?? DEFAULT_BATTLE_SIGMA), 0, 2);
   const dice = Math.max(1, Math.floor(Number(config.dice ?? DEFAULT_DICE)));
   const rush = Boolean(config.rush);
   const lossCap = clamp(Number(config.lossCap ?? DEFAULT_LOSS_CAP), 0, 1);
@@ -238,6 +240,11 @@ export function simulateBattle(config, rng) {
 
   const realAllies = buildSide(config.allies, config.allyBonus, lossCap);
   const realEnemies = buildSide(config.enemies, config.enemyBonus, lossCap);
+
+  // "Swing" di battaglia: un fattore di fortuna/morale fisso per tutta la
+  // battaglia. Rende meno automatico il vantaggio numerico (2:1 non è più 98/2).
+  const allyLuck = battleSigma * truncatedNormal(rng);
+  const enemyLuck = battleSigma * truncatedNormal(rng);
 
   const scale = Math.max(
     1,
@@ -258,8 +265,8 @@ export function simulateBattle(config, rng) {
     let enemyLosses = 0;
 
     for (let i = 0; i < pairs; i++) {
-      const allyRoll = Math.exp(sigma * truncatedNormal(rng));
-      const enemyRoll = Math.exp(sigma * truncatedNormal(rng));
+      const allyRoll = Math.exp(sigma * truncatedNormal(rng) + allyLuck);
+      const enemyRoll = Math.exp(sigma * truncatedNormal(rng) + enemyLuck);
 
       if (allyRoll > enemyRoll) enemyLosses += 1;
       else if (enemyRoll > allyRoll) alliedLosses += 1;

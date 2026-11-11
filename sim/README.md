@@ -15,10 +15,16 @@ Non richiede Foundry né dipendenze npm.
 - Ogni truppa effettiva vale 1: il vantaggio di un CR alto è nel numero di truppe.
 - Ogni round ogni lato schiera fino a `dice` truppe effettive (default 3).
 - Ogni confronto usa un jitter log-normale troncato a ±2σ.
-- `alpha` controlla il caos: `sigma = alpha × 0.6`.
+- `alpha` controlla il caos **per confronto**: `sigma = alpha × 0.6`.
   - `0` → deterministico
   - `0.3` → default
   - `1` → molto casuale
+- `battleSigma` ("swing") è l'imprevisto **di battaglia**: un fattore di
+  fortuna/morale fisso per tutto lo scontro. Rende meno automatico il vantaggio
+  numerico.
+  - `0` → i numeri dominano (2:1 ≈ 99/1)
+  - `0.10` → default (2:1 ≈ 78/22)
+  - `0.5+` → molti upset, ma il lato con più truppe resta favorito
 - Chi perde il confronto perde 1 truppa.
 - `rush = false` limita le perdite cumulative al `lossCap` (default 50%): la
   battaglia può finire senza distruggere un lato. Il primo lato che raggiunge
@@ -58,7 +64,8 @@ Opzioni:
 | --- | --- | --- |
 | `--ally` / `--enemy` | `1x10` | valori iniziali degli slider |
 | `--runs` | `20000` | battaglie simulate (console); nel report max 8000 |
-| `--alpha` | `0.3` | caos iniziale (0–1) |
+| `--alpha` | `0.3` | caos per confronto (0–1) |
+| `--battleSigma` | `0.1` | swing/imprevisto di battaglia (0–2) |
 | `--rush` | `false` | perdite illimitate iniziali |
 | `--lossCap` | `0.5` | limite perdite senza rush |
 | `--totalThreshold` | `0.95` | vittoria totale: margine / truppe iniziali del perdente |
@@ -73,6 +80,7 @@ In `sim/out/report.html`:
 - **slider** per truppe alleate e nemiche (1–200)
 - **slider** per il CR dei due lati (0–20)
 - **slider** per alpha
+- **slider** per lo swing (imprevisto di battaglia)
 - **checkbox** Rush
 - pulsante **Tira 0–100**: estrae un esito dalla curva (pesato sulle
   probabilità) e disegna la linea verticale dove è uscito
