@@ -127,7 +127,8 @@ Sul grafico:
 - il marker del tiro è dorato (vittoria totale alleati), rosso (vittoria totale
   nemici) o bianco (esito normale)
 
-Hover: probabilità, perdite medie e truppe medie in quel preciso esito.
+Hover: probabilità, perdite medie e truppe medie **per quel preciso margine**
+(media kernel pesata sulla probabilità dei bin vicini, non il bin più vicino).
 Sotto il grafico, il pannello del tiro mostra esito, perdite stimate e se è
 stata vittoria totale.
 

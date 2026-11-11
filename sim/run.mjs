@@ -713,9 +713,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
    * Smussa molto di più della media a 3 punti e riempie anche i "buchi"
    * tra un margine intero e l'altro.
    */
-  function smoothProbabilities(bins, min, max) {
-    var range = Math.max(1, max - min);
-    var bandwidth = Math.max(2, range * 0.05);
+  function smoothProbabilities(bins, min, max, bandwidth) {
     var radius = Math.ceil(bandwidth * 3);
     var grid = new Map();
 
@@ -747,6 +745,39 @@ function buildReportHtml({ engineSource, initial, settings }) {
       });
   }
 
+  /*
+   * Media kernel dei dettagli (perdite/sopravvissuti) vicino a ogni margine.
+   * Il peso include la probabilità del bin, così i bin rari non contano quanto
+   * quelli frequenti.
+   */
+  function smoothMetric(bins, min, max, key, bandwidth) {
+    var radius = Math.ceil(bandwidth * 3);
+    var result = new Map();
+
+    for (var v = Math.ceil(min); v <= Math.floor(max); v++) {
+      var sum = 0;
+      var weightSum = 0;
+
+      for (var i = 0; i < bins.length; i++) {
+        var bin = bins[i];
+        var distance = bin.value - v;
+        if (Math.abs(distance) > radius) continue;
+
+        var weight =
+          bin.probability *
+          Math.exp(-(distance * distance) / (2 * bandwidth * bandwidth));
+        if (weight <= 0) continue;
+
+        sum += bin[key] * weight;
+        weightSum += weight;
+      }
+
+      if (weightSum > 0) result.set(v, sum / weightSum);
+    }
+
+    return result;
+  }
+
   var lastRender = null;
 
   function render(distribution) {
@@ -760,13 +791,26 @@ function buildReportHtml({ engineSource, initial, settings }) {
     var xMin = Math.min.apply(null, xValues.concat([0])) - 1;
     var xMax = Math.max.apply(null, xValues.concat([0])) + 1;
 
-    var smoothed = smoothProbabilities(bins, xMin, xMax);
+    var range = Math.max(1, xMax - xMin);
+    var bandwidth = Math.max(2, range * 0.05);
+
+    var smoothed = smoothProbabilities(bins, xMin, xMax, bandwidth);
     var smoothMap = new Map();
     smoothed.forEach(function (point) { smoothMap.set(point.value, point.probability); });
 
+    var allyLossMap = smoothMetric(bins, xMin, xMax, "avgAllyLosses", bandwidth);
+    var enemyLossMap = smoothMetric(bins, xMin, xMax, "avgEnemyLosses", bandwidth);
+    var allySurvMap = smoothMetric(bins, xMin, xMax, "avgAllySurvivors", bandwidth);
+    var enemySurvMap = smoothMetric(bins, xMin, xMax, "avgEnemySurvivors", bandwidth);
+
     var probValues = smoothed.map(function (point) { return point.probability; });
-    var lossValues = bins.map(function (b) {
-      return Math.max(b.avgAllyLosses, b.avgEnemyLosses);
+
+    var lossValues = [];
+    smoothed.forEach(function (point) {
+      var ally = allyLossMap.get(point.value);
+      var enemy = enemyLossMap.get(point.value);
+      if (ally != null) lossValues.push(ally);
+      if (enemy != null) lossValues.push(enemy);
     });
 
     var probMax = Math.max.apply(null, probValues.concat([0.01])) * 1.18;
@@ -939,22 +983,28 @@ function buildReportHtml({ engineSource, initial, settings }) {
     }
 
     /* Perdite: due linee sull'asse destro */
-    function lossLine(key, color) {
-      var pts = bins.map(function (bin) {
-        return [xScale(bin.value), yLoss(bin[key])];
+    function lossLine(map, color) {
+      var pts = [];
+      smoothed.forEach(function (point) {
+        var value = map.get(point.value);
+        if (value == null) return;
+        pts.push([xScale(point.value), yLoss(value)]);
       });
+
+      if (pts.length < 2) return;
+
       var d = pts.map(function (pt, idx) {
         return (idx ? "L" : "M") + pt[0] + "," + pt[1];
       }).join(" ");
+
       svg.appendChild(el("path", {
         d: d, fill: "none", stroke: color,
-        "stroke-width": "2", "stroke-linejoin": "round", "stroke-linecap": "round",
-        "stroke-dasharray": "1 0"
+        "stroke-width": "2", "stroke-linejoin": "round", "stroke-linecap": "round"
       }));
     }
 
-    lossLine("avgAllyLosses", "var(--ally)");
-    lossLine("avgEnemyLosses", "var(--enemy)");
+    lossLine(allyLossMap, "var(--ally)");
+    lossLine(enemyLossMap, "var(--enemy)");
 
     /* Marker del tiro */
     if (lastRoll) {
@@ -999,19 +1049,6 @@ function buildReportHtml({ engineSource, initial, settings }) {
       return null;
     }
 
-    function nearestBin(value) {
-      var best = null;
-      var bestDistance = Infinity;
-      bins.forEach(function (bin) {
-        var distance = Math.abs(bin.value - value);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          best = bin;
-        }
-      });
-      return best;
-    }
-
     function formatProbability(probability) {
       if (probability <= 0) return "0%";
       if (probability < 0.0001) return "<0.01%";
@@ -1032,14 +1069,23 @@ function buildReportHtml({ engineSource, initial, settings }) {
       hoverLine.setAttribute("x2", xScale(hovered));
       hoverLine.setAttribute("opacity", "1");
 
-      var bin = binAt(hovered);
-      var detail = bin || nearestBin(hovered);
       var smoothProbability = smoothMap.get(hovered) ?? 0;
+
+      var allyLoss = allyLossMap.get(hovered);
+      var enemyLoss = enemyLossMap.get(hovered);
+      var allySurv = allySurvMap.get(hovered);
+      var enemySurv = enemySurvMap.get(hovered);
+
       var inDrawBand = state.drawBand > 0 && Math.abs(hovered) <= state.drawBand;
 
-      // Dentro la fascia di pareggio mostro la probabilità totale dei pareggi,
-      // non il valore sfumato della KDE in quel singolo punto.
-      if (inDrawBand && drawBin) smoothProbability = drawBin.probability;
+      // Dentro la fascia di pareggio mostro i dati del pareggio aggregato.
+      if (inDrawBand && drawBin) {
+        smoothProbability = drawBin.probability;
+        allyLoss = drawBin.avgAllyLosses;
+        enemyLoss = drawBin.avgEnemyLosses;
+        allySurv = drawBin.avgAllySurvivors;
+        enemySurv = drawBin.avgEnemySurvivors;
+      }
 
       var html =
         '<div style="font-weight:700;margin-bottom:6px">Vantaggio ' + hovered + '</div>';
@@ -1054,19 +1100,22 @@ function buildReportHtml({ engineSource, initial, settings }) {
           'Pareggio (entro ±' + state.drawBand + ')</b></div>';
       }
 
-      if (detail) {
+      if (
+        allyLoss != null &&
+        enemyLoss != null &&
+        allySurv != null &&
+        enemySurv != null
+      ) {
         html +=
-          '<div class="row"><span>Perdite alleate</span><b style="color:var(--ally)">' + detail.avgAllyLosses.toFixed(1) + '</b></div>' +
-          '<div class="row"><span>Perdite nemiche</span><b style="color:var(--enemy)">' + detail.avgEnemyLosses.toFixed(1) + '</b></div>' +
+          '<div class="row"><span>Perdite alleate</span><b style="color:var(--ally)">' + allyLoss.toFixed(1) + '</b></div>' +
+          '<div class="row"><span>Perdite nemiche</span><b style="color:var(--enemy)">' + enemyLoss.toFixed(1) + '</b></div>' +
           '<hr>' +
-          '<div class="row"><span>Truppe alleate</span><b>' + detail.avgAllySurvivors.toFixed(1) + '</b></div>' +
-          '<div class="row"><span>Truppe nemiche</span><b>' + detail.avgEnemySurvivors.toFixed(1) + '</b></div>';
-
-        if (!bin) {
-          html +=
-            '<div class="row" style="opacity:.55;margin-top:6px">' +
-            '<span>Dettagli dal bin più vicino</span><b>' + detail.value + '</b></div>';
-        }
+          '<div class="row"><span>Truppe alleate</span><b>' + allySurv.toFixed(1) + '</b></div>' +
+          '<div class="row"><span>Truppe nemiche</span><b>' + enemySurv.toFixed(1) + '</b></div>';
+      } else {
+        html +=
+          '<div class="row" style="opacity:.6;margin-top:6px">' +
+          '<span>Dettagli</span><b>—</b></div>';
       }
 
       els.tooltip.innerHTML = html;
