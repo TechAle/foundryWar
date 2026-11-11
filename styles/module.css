@@ -28,23 +28,23 @@
 
 .foundry-war-panel-app .window-content {
   padding: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .fw-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 0;
+  min-height: 100%;
+  height: auto;
 }
 
 .fw-columns {
-  flex: 1;
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
   padding: 0.5rem;
-  min-height: 0;
+  min-height: 300px;
 }
 
 .fw-column {
@@ -334,6 +334,293 @@
   color: #ffb347;
   border-color: #ffb347;
   box-shadow: 0 0 8px rgba(255, 179, 71, 0.5);
+}
+
+/* ========================================================================== */
+/* Battaglia                                                                  */
+/* ========================================================================== */
+
+.fw-battle {
+  border-top: 1px solid var(--color-border-light-tertiary, #555);
+  padding: 0.6rem;
+}
+
+.fw-battle h3 {
+  margin: 0 0 0.5rem;
+  font-size: var(--font-size-16, 1rem);
+}
+
+.fw-battle-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.fw-battle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.fw-battle-card span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.7;
+}
+
+.fw-battle-card b {
+  font-size: var(--font-size-16, 1rem);
+}
+
+.fw-battle-card i {
+  font-style: normal;
+}
+
+.fw-battle-card .ally,
+.fw-battle-result .ally,
+.fw-battle-losses .ally,
+.fw-battle-line .ally {
+  color: #7bd88f;
+}
+
+.fw-battle-card .enemy,
+.fw-battle-result .enemy,
+.fw-battle-losses .enemy,
+.fw-battle-line .enemy {
+  color: #ff8a8a;
+}
+
+.fw-graph-wrap {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 6px;
+  padding: 0.25rem;
+}
+
+.fw-battle-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.fw-graph-grid {
+  stroke: #2a2e36;
+  stroke-width: 1;
+}
+
+.fw-graph-axis {
+  fill: #9aa1ad;
+  font-size: 10px;
+}
+
+.fw-graph-zero {
+  stroke: #5a606b;
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.fw-graph-prob-area {
+  fill: #4cc9f0;
+  opacity: 0.1;
+}
+
+.fw-graph-prob {
+  fill: none;
+  stroke: #4cc9f0;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.fw-graph-loss-ally {
+  fill: none;
+  stroke: #7bd88f;
+  stroke-width: 1.8;
+}
+
+.fw-graph-loss-enemy {
+  fill: none;
+  stroke: #ff6b6b;
+  stroke-width: 1.8;
+}
+
+.fw-graph-zone-ally {
+  fill: #f0c674;
+  opacity: 0.07;
+}
+
+.fw-graph-zone-enemy {
+  fill: #ff6b6b;
+  opacity: 0.06;
+}
+
+.fw-graph-threshold {
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  opacity: 0.7;
+}
+
+.fw-graph-threshold.ally {
+  stroke: #f0c674;
+}
+
+.fw-graph-threshold.enemy {
+  stroke: #ff6b6b;
+}
+
+.fw-graph-threshold-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.fw-graph-threshold-label.ally {
+  fill: #f0c674;
+}
+
+.fw-graph-threshold-label.enemy {
+  fill: #ff6b6b;
+}
+
+.fw-graph-marker {
+  stroke-width: 2;
+  stroke-dasharray: 3 3;
+}
+
+.fw-graph-marker.ally {
+  stroke: #f0c674;
+}
+
+.fw-graph-marker.enemy {
+  stroke: #ff6b6b;
+}
+
+.fw-graph-marker.neutral {
+  stroke: #ffffff;
+}
+
+.fw-graph-marker-label {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.fw-graph-marker-label.ally {
+  fill: #f0c674;
+}
+
+.fw-graph-marker-label.enemy {
+  fill: #ff6b6b;
+}
+
+.fw-graph-marker-label.neutral {
+  fill: #ffffff;
+}
+
+.fw-battle-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.fw-roll,
+.fw-apply {
+  padding: 0.35rem 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fw-apply:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fw-battle-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.fw-battle-result.total {
+  border-color: #f0c674;
+  box-shadow: 0 0 8px rgba(240, 198, 116, 0.25);
+}
+
+.fw-battle-roll {
+  font-weight: 600;
+}
+
+.fw-battle-total {
+  color: #f0c674;
+  font-weight: 700;
+}
+
+.fw-hint {
+  margin: 0.3rem 0;
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.fw-breakdown-title {
+  margin: 0.7rem 0 0.3rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.75;
+}
+
+.fw-breakdown {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.fw-breakdown-side h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+}
+
+.fw-battle-line {
+  display: grid;
+  grid-template-columns: 1fr 32px 42px 48px 48px;
+  gap: 4px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+}
+
+.fw-battle-line.head {
+  opacity: 0.65;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.fw-battle-line .fw-unit-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fw-battle-line .ally {
+  color: #7bd88f;
+  font-weight: 600;
+}
+
+.fw-battle-line .enemy {
+  color: #ff8a8a;
+  font-weight: 600;
 }
 
 .foundry-war-highlight {

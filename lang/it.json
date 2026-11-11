@@ -19,9 +19,21 @@
         "name": "Tipi di truppa",
         "hint": "Elenco separato da virgole dei tipi di truppa mostrati nel dialog Guerra, es. Fanteria, Cavalleria, Arcieri."
       },
-      "battleBalance": {
-        "name": "Bilanciamento combattimento",
-        "hint": "0 = risultato deterministico, 1 = caso puro. Valori bassi riducono gli esiti estremi (stile Balanced Blitz)."
+      "battleAlpha": {
+        "name": "Caos per confronto",
+        "hint": "0 = deterministico, 0.15 = consigliato, 1 = molto casuale. Cambia le perdite, non chi vince."
+      },
+      "battleSwing": {
+        "name": "Swing (imprevisto di battaglia)",
+        "hint": "Fortuna/morale fisso per tutta la battaglia. Più è alto, meno contano i numeri. 0.05 = consigliato."
+      },
+      "battleCompression": {
+        "name": "Compressione forze",
+        "hint": "Comprime il rapporto tra le forze: più è alta, più truppe servono per lo stesso vantaggio. 0.2 = consigliato."
+      },
+      "battleTotalThreshold": {
+        "name": "Soglia vittoria totale",
+        "hint": "Il margine del vincitore deve raggiungere questa percentuale delle sue truppe iniziali. 80% = consigliato."
       }
     },
     "dialog": {
@@ -60,6 +72,36 @@
     "effects": {
       "inspiration": "Ispirazione da guerra (+1 CR)",
       "ranged": "Attacco a distanza (+2 CR)"
+    },
+    "battle": {
+      "title": "Battaglia",
+      "roll": "Tira 0–100",
+      "apply": "Applica",
+      "noRoll": "Premi Tira 0–100 per estrarre un esito dalla curva.",
+      "winAllies": "Vittoria alleati",
+      "winEnemies": "Vittoria nemici",
+      "avgLosses": "Perdite medie",
+      "totalChance": "Vittoria totale",
+      "threshold": "≥ {value}% del vincitore",
+      "rollResult": "Tiro {roll} → margine {margin}",
+      "totalYes": "Vittoria totale",
+      "totalNo": "Esito normale",
+      "breakdown": "Perdite per unità",
+      "name": "Nome",
+      "cr": "CR",
+      "troops": "Truppe",
+      "losses": "Perdite",
+      "survivors": "Restano",
+      "applied": "Perdite applicate alle truppe.",
+      "noPermission": "Non hai i permessi per applicare le perdite.",
+      "emptySide": "Servono unità da entrambe le parti per simulare la battaglia.",
+      "axisX": "vantaggio truppe",
+      "probability": "probabilità",
+      "lossesAxis": "perdite medie",
+      "totalAllies": "Vittoria totale alleati",
+      "totalEnemies": "Vittoria totale nemici",
+      "rollMarker": "Tiro",
+      "draw": "Pareggio"
     },
     "simulate": {
       "allies": "Esperienza alleati: {xp} XP",

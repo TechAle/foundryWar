@@ -41,11 +41,21 @@ localizzazione e release automatica su GitHub.
   ricliccando.
 - **Rush** (toggle globale): senza Rush le perdite future saranno limitate al
   50% delle truppe; con Rush si applicheranno le perdite massime.
-- **Simula guerra**: mostra due notifiche con gli XP totali di alleati e
-  nemici (non scrive nulla in chat).
+- **Simula guerra**: calcola la distribuzione degli esiti partendo da tutte le
+  unità del pannello (CR effettivo, HP = truppe, effetti e stance inclusi).
+  Sotto il pulsante compare:
+  - il **grafico** con curva di probabilità, perdite medie e zone di
+    vittoria totale
+  - **Tira 0–100**: estrae un esito e mostra il segnaposto sul grafico
+  - **Applica**: sottrae le perdite (in truppe) dalle HP degli attori
+  - la tabella **Perdite per unità**: i CR bassi assorbono più danni, ma non
+    tutti
 - XP: minimo **50**, arrotondato per difetto.
-- Il bilanciamento del futuro combattimento è una setting del GM,
-  **default 0.3** (`0` = deterministico, `1` = caso puro).
+- Impostazioni GM del combattimento:
+  - **Alpha** (caos per confronto): default `0.15`
+  - **Swing** (imprevisto di battaglia): default `0.05`
+  - **Compressione forze**: default `0.2`
+  - **Soglia vittoria totale**: default `80%`
 - Lo stato è una **world setting**, quindi condiviso in tempo reale tra tutti i
   client. I giocatori senza permessi di modifica passano la richiesta al GM via
   socket; il GM applica la modifica per tutti.

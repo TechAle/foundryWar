@@ -8,7 +8,17 @@
  *   schieramento) e arcieri (+2 CR a se stessi). Le schede non vengono toccate.
  */
 
-import { xpForCR } from "./battle-engine.js";
+import {
+  DEFAULT_ALPHA,
+  DEFAULT_BATTLE_SIGMA,
+  DEFAULT_FORCE_COMPRESSION,
+  DEFAULT_TOTAL_THRESHOLD,
+  distributeLosses,
+  isTotalVictory,
+  simulateDistribution,
+  totalVictoryRates,
+  xpForCR,
+} from "./battle-engine.js";
 
 const MODULE_ID = "foundry-war";
 const STATE_KEY = "warState";
@@ -148,6 +158,49 @@ function getHP(actor) {
   return { value, max };
 }
 
+async function setHP(actor, value) {
+  const system = actor?.system ?? {};
+  const rounded = Math.max(0, Math.round(value));
+
+  if (system.attributes?.hp?.value != null) {
+    return actor.update({ "system.attributes.hp.value": rounded });
+  }
+  if (system.hp?.value != null) {
+    return actor.update({ "system.hp.value": rounded });
+  }
+  if (system.health?.value != null) {
+    return actor.update({ "system.health.value": rounded });
+  }
+  return null;
+}
+
+function battleSettings() {
+  return {
+    alpha: Number(game.settings.get(MODULE_ID, "battleAlpha") ?? DEFAULT_ALPHA),
+    swing: Number(game.settings.get(MODULE_ID, "battleSwing") ?? DEFAULT_BATTLE_SIGMA),
+    compression: Number(
+      game.settings.get(MODULE_ID, "battleCompression") ?? DEFAULT_FORCE_COMPRESSION,
+    ),
+    threshold: Number(
+      game.settings.get(MODULE_ID, "battleTotalThreshold") ?? DEFAULT_TOTAL_THRESHOLD,
+    ),
+  };
+}
+
+function battleSignature(entries, state, settings) {
+  return JSON.stringify({
+    units: entries.map((entry) => [
+      entry.id,
+      entry.team,
+      entry.name,
+      entry.effectiveCR,
+      entry.hp?.value ?? 0,
+    ]),
+    rush: state.rush,
+    settings: [settings.alpha, settings.swing, settings.compression, settings.threshold],
+  });
+}
+
 function normalizeType(value) {
   return String(value ?? "")
     .normalize("NFD")
@@ -189,6 +242,8 @@ async function resolveEntries(state = getWarState()) {
 
       return {
         id,
+        actor,
+        tokenDoc,
         name: tokenDoc?.name ?? entry.name ?? actor?.name ?? "?",
         img: tokenDoc?.texture?.src ?? entry.img ?? actor?.img ?? "icons/svg/mystery-man.svg",
         team: war.team === "enemy" ? "enemy" : "ally",
@@ -350,21 +405,363 @@ function renderColumn(team, entries, stance, escapeHTML) {
   `;
 }
 
-async function buildPanelElement() {
-  const state = getWarState();
-  const entries = await resolveEntries(state);
+/* -------------------------------------------------------------------------- */
+/* Battaglia: simulazione, grafo, tiro, applicazione                          */
+/* -------------------------------------------------------------------------- */
+
+function fmtPct(value) {
+  return `${(Number(value) * 100).toFixed(1)}%`;
+}
+
+function fmtNum(value) {
+  return value == null ? "—" : Number(value).toFixed(1);
+}
+
+function buildBattle(entries, state) {
+  const settings = battleSettings();
+  const sides = { ally: [], enemy: [] };
+
+  for (const entry of entries) {
+    sides[entry.team].push({
+      id: entry.id,
+      name: entry.name,
+      cr: entry.effectiveCR,
+      troops: Math.max(0, Math.floor(entry.hp?.value ?? 0)),
+      actor: entry.actor,
+    });
+  }
+
+  if (!sides.ally.length || !sides.enemy.length) return { error: "empty" };
+
+  const config = {
+    allies: sides.ally.map(({ cr, troops }) => ({ cr, troops })),
+    enemies: sides.enemy.map(({ cr, troops }) => ({ cr, troops })),
+    alpha: settings.alpha,
+    battleSigma: settings.swing,
+    forceCompression: settings.compression,
+    rush: state.rush,
+    lossCap: 0.5,
+    dice: 3,
+  };
+
+  const distribution = simulateDistribution(config, 8000, 12345);
+  if (!distribution.alliesInitial || !distribution.enemiesInitial) {
+    return { error: "empty" };
+  }
+
+  return {
+    settings,
+    sides,
+    distribution,
+    threshold: settings.threshold,
+    signature: battleSignature(entries, state, settings),
+    roll: null,
+  };
+}
+
+function smoothBattleProbabilities(bins, min, max) {
+  const range = Math.max(1, max - min);
+  const bandwidth = Math.max(2, range * 0.05);
+  const radius = Math.ceil(bandwidth * 3);
+  const grid = new Map();
+  const step = Math.max(1, Math.ceil((max - min) / 600));
+
+  for (let value = Math.ceil(min); value <= Math.floor(max); value += step) {
+    grid.set(value, 0);
+  }
+
+  for (const bin of bins) {
+    const weights = [];
+    let weightSum = 0;
+
+    for (let d = -radius; d <= radius; d += 1) {
+      const value = bin.value + d;
+      if (!grid.has(value)) continue;
+      const weight = Math.exp(-(d * d) / (2 * bandwidth * bandwidth));
+      weights.push([value, weight]);
+      weightSum += weight;
+    }
+
+    if (!weightSum) continue;
+
+    for (const [value, weight] of weights) {
+      grid.set(value, grid.get(value) + (bin.probability * weight) / weightSum);
+    }
+  }
+
+  return [...grid.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([value, probability]) => ({ value, probability }));
+}
+
+function renderBattleGraph(battle) {
+  const dist = battle.distribution;
+  const bins = dist.bins;
+  if (!bins.length) return "";
+
+  const W = 920;
+  const H = 360;
+  const M = { top: 20, right: 96, bottom: 46, left: 58 };
+  const values = bins.map((bin) => bin.value);
+  const xMin = Math.min(...values, 0) - 1;
+  const xMax = Math.max(...values, 0) + 1;
+  const smoothed = smoothBattleProbabilities(bins, xMin, xMax);
+  const probMax = Math.max(...smoothed.map((p) => p.probability), 0.01) * 1.18;
+  const lossMax =
+    Math.max(...bins.map((bin) => Math.max(bin.avgAllyLosses, bin.avgEnemyLosses)), 1) * 1.18;
+
+  const sx = (v) => M.left + ((v - xMin) / (xMax - xMin || 1)) * (W - M.left - M.right);
+  const syP = (p) => H - M.bottom - (p / probMax) * (H - M.top - M.bottom);
+  const syL = (l) => H - M.bottom - (l / lossMax) * (H - M.top - M.bottom);
+
+  const parts = [];
+  parts.push(
+    `<svg viewBox="0 0 ${W} ${H}" class="fw-battle-graph" role="img" aria-label="${game.i18n.localize("FOUNDRY-WAR.battle.title")}">`,
+  );
+
+  for (let i = 0; i <= 4; i += 1) {
+    const probability = (probMax / 4) * i;
+    const y = syP(probability);
+    parts.push(
+      `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" class="fw-graph-grid"></line>`,
+      `<text x="${M.left - 8}" y="${y + 3}" text-anchor="end" class="fw-graph-axis">${(probability * 100).toFixed(1)}%</text>`,
+      `<text x="${W - M.right + 8}" y="${y + 3}" text-anchor="start" class="fw-graph-axis">${((lossMax / 4) * i).toFixed(0)}</text>`,
+    );
+  }
+
+  const step = Math.max(1, Math.round((xMax - xMin) / 12));
+  for (let value = Math.ceil(xMin); value <= xMax; value += step) {
+    parts.push(
+      `<text x="${sx(value)}" y="${H - M.bottom + 16}" text-anchor="middle" class="fw-graph-axis">${value}</text>`,
+    );
+  }
+
+  parts.push(
+    `<text x="${M.left}" y="${M.top - 6}" class="fw-graph-axis">${game.i18n.localize("FOUNDRY-WAR.battle.probability")}</text>`,
+    `<text x="${W - M.right}" y="${M.top - 6}" text-anchor="end" class="fw-graph-axis">${game.i18n.localize("FOUNDRY-WAR.battle.lossesAxis")}</text>`,
+    `<text x="${(M.left + W - M.right) / 2}" y="${H - 8}" text-anchor="middle" class="fw-graph-axis">${game.i18n.localize("FOUNDRY-WAR.battle.axisX")}</text>`,
+    `<line x1="${sx(0)}" x2="${sx(0)}" y1="${M.top}" y2="${H - M.bottom}" class="fw-graph-zero"></line>`,
+  );
+
+  const posThreshold = battle.threshold * dist.alliesInitial;
+  const negThreshold = -battle.threshold * dist.enemiesInitial;
+
+  const zone = (from, to, cls) => {
+    const x1 = Math.max(M.left, sx(Math.max(Math.min(from, to), xMin)));
+    const x2 = Math.min(W - M.right, sx(Math.min(Math.max(from, to), xMax)));
+    if (x2 - x1 < 1) return;
+    parts.push(
+      `<rect x="${x1}" y="${M.top}" width="${x2 - x1}" height="${H - M.top - M.bottom}" class="${cls}"></rect>`,
+    );
+  };
+
+  if (posThreshold < xMax) zone(Math.max(posThreshold, xMin), xMax, "fw-graph-zone-ally");
+  if (negThreshold > xMin) zone(xMin, Math.min(negThreshold, xMax), "fw-graph-zone-enemy");
+
+  const formatThreshold = (value) =>
+    `${value >= 0 ? "+" : ""}${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}`;
+
+  const thresholdLine = (value, cls, label) => {
+    if (value <= xMin || value >= xMax) return;
+    const x = sx(value);
+    parts.push(
+      `<line x1="${x}" x2="${x}" y1="${M.top}" y2="${H - M.bottom}" class="fw-graph-threshold ${cls}"></line>`,
+    );
+    const anchor = x > W - M.right - 150 ? "end" : "start";
+    parts.push(
+      `<text x="${x + (anchor === "end" ? -6 : 6)}" y="${M.top + 12}" text-anchor="${anchor}" class="fw-graph-threshold-label ${cls}">${label}</text>`,
+    );
+  };
+
+  thresholdLine(
+    posThreshold,
+    "ally",
+    `${game.i18n.localize("FOUNDRY-WAR.battle.totalAllies")} ≥ ${formatThreshold(posThreshold)}`,
+  );
+  thresholdLine(
+    negThreshold,
+    "enemy",
+    `${game.i18n.localize("FOUNDRY-WAR.battle.totalEnemies")} ≤ ${formatThreshold(negThreshold)}`,
+  );
+
+  const probPoints = smoothed.map((point) => [sx(point.value), syP(point.probability)]);
+  const probLine = probPoints
+    .map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`)
+    .join(" ");
+  const probArea = `${probLine} L${probPoints[probPoints.length - 1][0].toFixed(1)},${H - M.bottom} L${probPoints[0][0].toFixed(1)},${H - M.bottom} Z`;
+
+  parts.push(
+    `<path d="${probArea}" class="fw-graph-prob-area"></path>`,
+    `<path d="${probLine}" class="fw-graph-prob"></path>`,
+  );
+
+  const lossPath = (key, cls) => {
+    const points = bins.map((bin) => [sx(bin.value), syL(bin[key])]);
+    if (points.length < 2) return;
+    const d = points
+      .map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`)
+      .join(" ");
+    parts.push(`<path d="${d}" class="${cls}"></path>`);
+  };
+
+  lossPath("avgAllyLosses", "fw-graph-loss-ally");
+  lossPath("avgEnemyLosses", "fw-graph-loss-enemy");
+
+  if (battle.roll) {
+    const total = isTotalVictory(
+      battle.roll.bin.value,
+      dist.alliesInitial,
+      dist.enemiesInitial,
+      battle.threshold,
+    );
+    const side = total ? (battle.roll.bin.value > 0 ? "ally" : "enemy") : "neutral";
+    const x = sx(battle.roll.bin.value);
+    parts.push(
+      `<line x1="${x}" x2="${x}" y1="${M.top}" y2="${H - M.bottom}" class="fw-graph-marker ${side}"></line>`,
+      `<text x="${Math.min(x + 5, W - M.right - 60)}" y="${M.top + 12}" class="fw-graph-marker-label ${side}">${game.i18n.localize("FOUNDRY-WAR.battle.rollMarker")} ${(battle.roll.r * 100).toFixed(1)}</text>`,
+    );
+  }
+
+  parts.push("</svg>");
+  return parts.join("");
+}
+
+function renderBreakdownSide(title, rows, side, escapeHTML) {
+  const head = `
+    <div class="fw-battle-line head">
+      <span>${game.i18n.localize("FOUNDRY-WAR.battle.name")}</span>
+      <span>${game.i18n.localize("FOUNDRY-WAR.battle.cr")}</span>
+      <span>${game.i18n.localize("FOUNDRY-WAR.battle.troops")}</span>
+      <span>${game.i18n.localize("FOUNDRY-WAR.battle.losses")}</span>
+      <span>${game.i18n.localize("FOUNDRY-WAR.battle.survivors")}</span>
+    </div>
+  `;
+
+  const body = rows
+    .map(
+      (row) => `
+        <div class="fw-battle-line">
+          <span class="fw-unit-name" title="${escapeHTML(row.name)}">${escapeHTML(row.name)}</span>
+          <span>${row.cr}</span>
+          <span>${row.troops}</span>
+          <span class="${side}">${row.troopLosses}</span>
+          <span>${row.troopSurvivors}</span>
+        </div>
+      `,
+    )
+    .join("");
+
+  return `<div class="fw-breakdown-side"><h4>${title}</h4>${head}${body}</div>`;
+}
+
+function renderBattleSection(battle) {
+  if (!battle) return "";
+
+  const escapeHTML = foundry.utils.escapeHTML;
+  const dist = battle.distribution;
+  const rates = totalVictoryRates(dist, battle.threshold);
+  const average = dist.average ?? { allies: { losses: 0 }, enemies: { losses: 0 } };
+  const roll = battle.roll;
+  const total = roll
+    ? isTotalVictory(roll.bin.value, dist.alliesInitial, dist.enemiesInitial, battle.threshold)
+    : false;
+  const winner = roll
+    ? roll.bin.value > 0
+      ? game.i18n.localize("FOUNDRY-WAR.battle.winAllies")
+      : roll.bin.value < 0
+        ? game.i18n.localize("FOUNDRY-WAR.battle.winEnemies")
+        : game.i18n.localize("FOUNDRY-WAR.battle.draw")
+    : "";
+
+  const cards = `
+    <div class="fw-battle-cards">
+      <div class="fw-battle-card">
+        <span>${game.i18n.localize("FOUNDRY-WAR.battle.winAllies")}</span>
+        <b>${fmtPct(dist.allyWinRate)}</b>
+      </div>
+      <div class="fw-battle-card">
+        <span>${game.i18n.localize("FOUNDRY-WAR.battle.winEnemies")}</span>
+        <b>${fmtPct(dist.enemyWinRate)}</b>
+      </div>
+      <div class="fw-battle-card">
+        <span>${game.i18n.localize("FOUNDRY-WAR.battle.avgLosses")}</span>
+        <b><i class="ally">A ${fmtNum(average.allies.losses)}</i> / <i class="enemy">N ${fmtNum(average.enemies.losses)}</i></b>
+      </div>
+      <div class="fw-battle-card">
+        <span>${game.i18n.localize("FOUNDRY-WAR.battle.totalChance")}</span>
+        <b><i class="ally">A ${fmtPct(rates.ally)}</i> / <i class="enemy">N ${fmtPct(rates.enemy)}</i></b>
+      </div>
+    </div>
+  `;
+
+  let result = `<p class="fw-hint">${game.i18n.localize("FOUNDRY-WAR.battle.noRoll")}</p>`;
+  let breakdown = "";
+
+  if (roll) {
+    const margin = `${roll.bin.value > 0 ? "+" : ""}${roll.bin.value.toLocaleString()}`;
+    result = `
+      <div class="fw-battle-result${total ? " total" : ""}">
+        <div class="fw-battle-roll">
+          ${game.i18n.format("FOUNDRY-WAR.battle.rollResult", {
+            roll: (roll.r * 100).toFixed(1),
+            margin,
+          })}
+        </div>
+        <div class="fw-battle-winner">${winner}</div>
+        <div class="fw-battle-losses">
+          ${game.i18n.localize("FOUNDRY-WAR.battle.avgLosses")}:
+          <b class="ally">A ${fmtNum(roll.bin.avgAllyLosses)}</b> /
+          <b class="enemy">N ${fmtNum(roll.bin.avgEnemyLosses)}</b>
+        </div>
+        ${total ? `<div class="fw-battle-total">${game.i18n.localize("FOUNDRY-WAR.battle.totalYes")}</div>` : ""}
+      </div>
+    `;
+
+    breakdown = `
+      <h4 class="fw-breakdown-title">${game.i18n.localize("FOUNDRY-WAR.battle.breakdown")}</h4>
+      <div class="fw-breakdown">
+        ${renderBreakdownSide(game.i18n.localize("FOUNDRY-WAR.panel.allies"), roll.allyRows, "ally", escapeHTML)}
+        ${renderBreakdownSide(game.i18n.localize("FOUNDRY-WAR.panel.enemies"), roll.enemyRows, "enemy", escapeHTML)}
+      </div>
+    `;
+  }
+
+  return `
+    <section class="fw-battle">
+      <h3>${game.i18n.localize("FOUNDRY-WAR.battle.title")}</h3>
+      ${cards}
+      <div class="fw-graph-wrap">${renderBattleGraph(battle)}</div>
+      <div class="fw-battle-actions">
+        <button type="button" class="fw-roll" data-action="rollBattle">
+          <i class="fa-solid fa-dice-d20"></i>
+          ${game.i18n.localize("FOUNDRY-WAR.battle.roll")}
+        </button>
+        <button type="button" class="fw-apply" data-action="applyBattle" ${roll ? "" : "disabled"}>
+          <i class="fa-solid fa-check"></i>
+          ${game.i18n.localize("FOUNDRY-WAR.battle.apply")}
+        </button>
+      </div>
+      ${result}
+      ${breakdown}
+    </section>
+  `;
+}
+
+async function buildPanelElement(state = getWarState(), entries = null, battleState = null) {
+  const currentState = state;
+  const currentEntries = entries ?? (await resolveEntries(currentState));
   const { escapeHTML } = foundry.utils;
 
   const root = document.createElement("div");
   root.className = "fw-panel";
   root.innerHTML = `
     <div class="fw-columns">
-      ${renderColumn("ally", entries.filter((e) => e.team === "ally"), state.stances.ally, escapeHTML)}
-      ${renderColumn("enemy", entries.filter((e) => e.team === "enemy"), state.stances.enemy, escapeHTML)}
+      ${renderColumn("ally", currentEntries.filter((e) => e.team === "ally"), currentState.stances.ally, escapeHTML)}
+      ${renderColumn("enemy", currentEntries.filter((e) => e.team === "enemy"), currentState.stances.enemy, escapeHTML)}
     </div>
     <footer class="fw-footer">
-      <button type="button" class="fw-rush${state.rush ? " active" : ""}"
-              data-action="toggleRush" aria-pressed="${state.rush}"
+      <button type="button" class="fw-rush${currentState.rush ? " active" : ""}"
+              data-action="toggleRush" aria-pressed="${currentState.rush}"
               data-tooltip="${game.i18n.localize("FOUNDRY-WAR.panel.rushHint")}">
         <i class="fa-solid fa-bolt"></i>
         ${game.i18n.localize("FOUNDRY-WAR.panel.rush")}
@@ -374,6 +771,7 @@ async function buildPanelElement() {
         ${game.i18n.localize("FOUNDRY-WAR.panel.simulate")}
       </button>
     </footer>
+    ${renderBattleSection(battleState)}
   `;
 
   return root;
@@ -394,9 +792,11 @@ export class WarPanel extends ApplicationV2 {
       icon: "fa-solid fa-flag",
       resizable: true,
     },
-    position: { width: 960, height: 620 },
+    position: { width: 980, height: 860 },
     actions: {
       simulateWar: WarPanel.onSimulateWar,
+      rollBattle: WarPanel.onRollBattle,
+      applyBattle: WarPanel.onApplyBattle,
       removeEntry: WarPanel.onRemoveEntry,
       toggleEffect: WarPanel.onToggleEffect,
       adjustCR: WarPanel.onAdjustCR,
@@ -406,7 +806,18 @@ export class WarPanel extends ApplicationV2 {
   };
 
   async _renderHTML() {
-    return buildPanelElement();
+    const state = getWarState();
+    const entries = await resolveEntries(state);
+    const settings = battleSettings();
+
+    if (
+      this.battleState &&
+      this.battleState.signature !== battleSignature(entries, state, settings)
+    ) {
+      this.battleState = null;
+    }
+
+    return buildPanelElement(state, entries, this.battleState);
   }
 
   _replaceHTML(result, content) {
@@ -490,19 +901,95 @@ export class WarPanel extends ApplicationV2 {
   }
 
   static async onSimulateWar() {
-    const entries = await resolveEntries();
-    const sum = (team) =>
-      entries.filter((entry) => entry.team === team).reduce((total, entry) => total + entry.xp, 0);
+    const state = getWarState();
+    const entries = await resolveEntries(state);
+    const battle = buildBattle(entries, state);
 
-    const allies = sum("ally");
-    const enemies = sum("enemy");
+    if (battle.error) {
+      ui.notifications.warn(game.i18n.localize("FOUNDRY-WAR.battle.emptySide"));
+      return;
+    }
 
-    ui.notifications.info(
-      game.i18n.format("FOUNDRY-WAR.simulate.allies", { xp: allies.toLocaleString() }),
-    );
-    ui.notifications.info(
-      game.i18n.format("FOUNDRY-WAR.simulate.enemies", { xp: enemies.toLocaleString() }),
-    );
+    this.battleState = battle;
+    await this.render();
+  }
+
+  static async onRollBattle() {
+    const battle = this.battleState;
+    const bins = battle?.distribution?.bins;
+    if (!bins?.length) return;
+
+    const random = Math.random();
+    let cumulative = 0;
+    let bin = bins[bins.length - 1];
+
+    for (const candidate of bins) {
+      cumulative += candidate.probability;
+      if (random <= cumulative) {
+        bin = candidate;
+        break;
+      }
+    }
+
+    const seed = Math.floor(Math.random() * 1e9);
+    const allyRows = distributeLosses(battle.sides.ally, bin.avgAllyLosses, { seed });
+    const enemyRows = distributeLosses(battle.sides.enemy, bin.avgEnemyLosses, {
+      seed: seed + 1,
+    });
+
+    battle.roll = { r: random, bin, allyRows, enemyRows };
+    await this.render();
+  }
+
+  static async onApplyBattle() {
+    const battle = this.battleState;
+    if (!battle?.roll) return;
+
+    const entries = [
+      ...battle.roll.allyRows.map((row, index) => ({
+        row,
+        unit: battle.sides.ally[index],
+      })),
+      ...battle.roll.enemyRows.map((row, index) => ({
+        row,
+        unit: battle.sides.enemy[index],
+      })),
+    ];
+
+    // Se lo stesso attore compare su più token, sommo le perdite e applico
+    // una sola volta alle sue HP.
+    const byActor = new Map();
+
+    for (const { row, unit } of entries) {
+      if (!unit?.actor || !row.troopLosses) continue;
+
+      const current = byActor.get(unit.actor.uuid) ?? { actor: unit.actor, loss: 0 };
+      current.loss += row.troopLosses;
+      byActor.set(unit.actor.uuid, current);
+    }
+
+    for (const { actor } of byActor.values()) {
+      if (!actor.isOwner && !game.user.isGM) {
+        ui.notifications.warn(game.i18n.localize("FOUNDRY-WAR.battle.noPermission"));
+        return;
+      }
+    }
+
+    const updates = [];
+    for (const { actor, loss } of byActor.values()) {
+      const hp = getHP(actor);
+      if (!hp || hp.value == null) continue;
+      updates.push({
+        actor,
+        value: Math.max(0, hp.value - loss),
+      });
+    }
+
+    await Promise.all(updates.map(({ actor, value }) => setHP(actor, value)));
+
+    this.battleState = null;
+    await this.render();
+    ui.notifications.info(game.i18n.localize("FOUNDRY-WAR.battle.applied"));
   }
 }
 

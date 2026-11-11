@@ -19,9 +19,21 @@
         "name": "Troop types",
         "hint": "Comma-separated list of troop types shown in the War dialog, e.g. Infantry, Cavalry, Archers."
       },
-      "battleBalance": {
-        "name": "Combat balance",
-        "hint": "0 = deterministic outcome, 1 = pure chance. Lower values reduce extreme results (Balanced Blitz style)."
+      "battleAlpha": {
+        "name": "Per-round chaos",
+        "hint": "0 = deterministic, 0.15 = recommended, 1 = very random. Changes losses, not who wins."
+      },
+      "battleSwing": {
+        "name": "Swing (battle surprise)",
+        "hint": "Fixed luck/morale for the whole battle. Higher means numbers matter less. 0.05 = recommended."
+      },
+      "battleCompression": {
+        "name": "Force compression",
+        "hint": "Compresses the force ratio: higher means more troops are needed for the same advantage. 0.2 = recommended."
+      },
+      "battleTotalThreshold": {
+        "name": "Total victory threshold",
+        "hint": "The winner's margin must reach this percentage of their initial troops. 80% = recommended."
       }
     },
     "dialog": {
@@ -60,6 +72,36 @@
     "effects": {
       "inspiration": "War inspiration (+1 CR)",
       "ranged": "Ranged attack (+2 CR)"
+    },
+    "battle": {
+      "title": "Battle",
+      "roll": "Roll 0–100",
+      "apply": "Apply",
+      "noRoll": "Press Roll 0–100 to draw an outcome from the curve.",
+      "winAllies": "Allied victory",
+      "winEnemies": "Enemy victory",
+      "avgLosses": "Average losses",
+      "totalChance": "Total victory",
+      "threshold": "≥ {value}% of the winner",
+      "rollResult": "Roll {roll} → margin {margin}",
+      "totalYes": "Total victory",
+      "totalNo": "Normal outcome",
+      "breakdown": "Losses per unit",
+      "name": "Name",
+      "cr": "CR",
+      "troops": "Troops",
+      "losses": "Losses",
+      "survivors": "Left",
+      "applied": "Losses applied to troops.",
+      "noPermission": "You do not have permission to apply the losses.",
+      "emptySide": "Both sides need at least one unit to simulate a battle.",
+      "axisX": "troop advantage",
+      "probability": "probability",
+      "lossesAxis": "average losses",
+      "totalAllies": "Allied total victory",
+      "totalEnemies": "Enemy total victory",
+      "rollMarker": "Roll",
+      "draw": "Draw"
     },
     "simulate": {
       "allies": "Allies experience: {xp} XP",
