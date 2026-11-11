@@ -39,6 +39,9 @@ Non richiede Foundry né dipendenze npm.
   battaglia può finire senza distruggere un lato. Il primo lato che raggiunge
   il limite si ritira.
 - `rush = true` rimuove il limite: si continua fino allo sterminio.
+- **Pareggio**: se il margine finale è entro `drawBand` (default 2 truppe
+  effettive) e nessuno dei due è stato azzerato, l'esito è un pareggio. Con
+  forze identiche succede circa il 14% delle volte. `0` disattiva i pareggi.
 - **Vittoria totale**: il margine del vincitore è ≥ `totalThreshold`
   (default 80%) delle truppe iniziali **del vincitore**. In pratica il vincitore
   conserva quasi tutto il suo esercito e travolge il perdente. Non è un
@@ -78,6 +81,7 @@ Opzioni:
 | `--alpha` | `0.15` | caos per confronto (0–1) |
 | `--battleSigma` | `0.05` | swing/imprevisto di battaglia (0–2) |
 | `--compression` | `0.2` | compressione forze: più alta = più truppe per un vantaggio (0–1) |
+| `--drawBand` | `2` | margine entro cui la battaglia è un pareggio (0 = mai) |
 | `--rush` | `false` | perdite illimitate iniziali |
 | `--lossCap` | `0.5` | limite perdite senza rush |
 | `--totalThreshold` | `0.8` | vittoria totale: margine / truppe iniziali del vincitore |
@@ -95,6 +99,7 @@ In `sim/out/report.html` (passa o clicca sul **?** accanto a ogni voce per la sp
 - **slider** per lo swing (imprevisto di battaglia)
 - **slider** per la soglia di vittoria totale
 - **slider** per la compressione delle forze
+- **slider** per la soglia di pareggio
 - **checkbox** Rush
 - pulsante **Tira 0–100**: estrae un esito dalla curva (pesato sulle
   probabilità) e disegna la linea verticale dove è uscito

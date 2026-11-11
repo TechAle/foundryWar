@@ -25,6 +25,7 @@ export const DEFAULT_ALPHA = 0.15;
 export const DEFAULT_BATTLE_SIGMA = 0.05;
 export const DEFAULT_TOTAL_THRESHOLD = 0.8;
 export const DEFAULT_FORCE_COMPRESSION = 0.2;
+export const DEFAULT_DRAW_BAND = 2;
 export const DEFAULT_DICE = 3;
 export const DEFAULT_LOSS_CAP = 0.5;
 export const DEFAULT_DECISIVE_THRESHOLD = 0.95;
@@ -340,6 +341,21 @@ export function simulateBattle(config, rng) {
   const alliesResult = realSide(allies, realAllies);
   const enemiesResult = realSide(enemies, realEnemies);
 
+  let margin = alliesResult.survivors - enemiesResult.survivors;
+
+  // Pareggio: se entrambi sopravvivono e il margine è entro la soglia,
+  // la battaglia è un pareggio (non un vincitore con 1-2 truppe di vantaggio).
+  const drawBand = Math.max(0, Math.floor(Number(config.drawBand ?? DEFAULT_DRAW_BAND)));
+  if (
+    drawBand > 0 &&
+    alliesResult.survivors > 0 &&
+    enemiesResult.survivors > 0 &&
+    Math.abs(margin) <= drawBand
+  ) {
+    winner = "draw";
+    margin = 0;
+  }
+
   return {
     winner,
     rounds,
@@ -347,7 +363,7 @@ export function simulateBattle(config, rng) {
     compression,
     allies: alliesResult,
     enemies: enemiesResult,
-    margin: alliesResult.survivors - enemiesResult.survivors,
+    margin,
     decisive: false,
   };
 }
