@@ -101,7 +101,12 @@
       "totalAllies": "Allied total victory",
       "totalEnemies": "Enemy total victory",
       "rollMarker": "Roll",
-      "draw": "Draw"
+      "draw": "Draw",
+      "advantage": "Advantage",
+      "allyLosses": "Allied losses",
+      "enemyLosses": "Enemy losses",
+      "allyTroops": "Allied troops",
+      "enemyTroops": "Enemy troops"
     },
     "simulate": {
       "allies": "Allies experience: {xp} XP",

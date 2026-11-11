@@ -41,6 +41,17 @@ export function getWarState() {
       enemy: STANCES.includes(state?.stances?.enemy) ? state.stances.enemy : "none",
     },
     rush: Boolean(state?.rush),
+    battle: {
+      active: Boolean(state?.battle?.active),
+      roll: state?.battle?.roll
+        ? {
+            r: Number(state.battle.roll.r) || 0,
+            value: Number(state.battle.roll.value) || 0,
+            seed: Number(state.battle.roll.seed) || 0,
+            signature: String(state.battle.roll.signature ?? ""),
+          }
+        : null,
+    },
   };
 }
 
@@ -56,6 +67,17 @@ export async function commitWarState(next) {
       enemy: STANCES.includes(next?.stances?.enemy) ? next.stances.enemy : "none",
     },
     rush: Boolean(next?.rush),
+    battle: {
+      active: Boolean(next?.battle?.active),
+      roll: next?.battle?.roll
+        ? {
+            r: Number(next.battle.roll.r) || 0,
+            value: Number(next.battle.roll.value) || 0,
+            seed: Number(next.battle.roll.seed) || 0,
+            signature: String(next.battle.roll.signature ?? ""),
+          }
+        : null,
+    },
   };
 
   if (game.user.isGM) {
@@ -89,7 +111,11 @@ export async function toggleTokensInWar(tokens) {
 
   const state = getWarState();
   const allPresent = list.every((token) => state.entries[token.document.uuid]);
-  const next = { ...state, entries: { ...state.entries } };
+  const next = {
+    ...state,
+    entries: { ...state.entries },
+    battle: { ...state.battle, roll: null },
+  };
 
   for (const token of list) {
     const id = token.document.uuid;
@@ -516,7 +542,11 @@ function renderBattleGraph(battle) {
 
   const parts = [];
   parts.push(
-    `<svg viewBox="0 0 ${W} ${H}" class="fw-battle-graph" role="img" aria-label="${game.i18n.localize("FOUNDRY-WAR.battle.title")}">`,
+    `<svg viewBox="0 0 ${W} ${H}" class="fw-battle-graph"
+      data-xmin="${xMin}" data-xmax="${xMax}"
+      data-plot-left="${M.left}" data-plot-right="${W - M.right}"
+      data-width="${W}" role="img"
+      aria-label="${game.i18n.localize("FOUNDRY-WAR.battle.title")}">`,
   );
 
   for (let i = 0; i <= 4; i += 1) {
@@ -730,7 +760,10 @@ function renderBattleSection(battle) {
     <section class="fw-battle">
       <h3>${game.i18n.localize("FOUNDRY-WAR.battle.title")}</h3>
       ${cards}
-      <div class="fw-graph-wrap">${renderBattleGraph(battle)}</div>
+      <div class="fw-graph-wrap">
+        ${renderBattleGraph(battle)}
+        <div class="fw-graph-tooltip"></div>
+      </div>
       <div class="fw-battle-actions">
         <button type="button" class="fw-roll" data-action="rollBattle">
           <i class="fa-solid fa-dice-d20"></i>
@@ -809,19 +842,125 @@ export class WarPanel extends ApplicationV2 {
     const state = getWarState();
     const entries = await resolveEntries(state);
     const settings = battleSettings();
+    const signature = battleSignature(entries, state, settings);
 
-    if (
-      this.battleState &&
-      this.battleState.signature !== battleSignature(entries, state, settings)
-    ) {
-      this.battleState = null;
+    let battle = null;
+
+    if (state.battle.active) {
+      if (this.battleCache?.signature === signature) {
+        battle = this.battleCache.battle;
+      } else {
+        const built = buildBattle(entries, state);
+
+        if (!built.error) {
+          battle = built;
+          this.battleCache = { signature, battle };
+        }
+      }
+    } else {
+      this.battleCache = null;
     }
 
-    return buildPanelElement(state, entries, this.battleState);
+    if (battle) {
+      battle.roll = null;
+
+      const storedRoll = state.battle.roll;
+      if (storedRoll && storedRoll.signature === signature) {
+        const bin = battle.distribution.bins.find(
+          (candidate) => candidate.value === storedRoll.value,
+        );
+
+        if (bin) {
+          battle.roll = {
+            r: storedRoll.r,
+            bin,
+            allyRows: distributeLosses(battle.sides.ally, bin.avgAllyLosses, {
+              seed: storedRoll.seed,
+            }),
+            enemyRows: distributeLosses(battle.sides.enemy, bin.avgEnemyLosses, {
+              seed: storedRoll.seed + 1,
+            }),
+          };
+        }
+      }
+    }
+
+    this.currentBattle = battle;
+    return buildPanelElement(state, entries, battle);
   }
 
   _replaceHTML(result, content) {
     content.replaceChildren(result);
+  }
+
+  _onRender(context, options) {
+    super._onRender?.(context, options);
+
+    const svg = this.element.querySelector(".fw-battle-graph");
+    const tooltip = this.element.querySelector(".fw-graph-tooltip");
+    const battle = this.currentBattle;
+
+    if (!svg || !tooltip || !battle) return;
+
+    const xMin = Number(svg.dataset.xmin);
+    const xMax = Number(svg.dataset.xmax);
+    const plotLeft = Number(svg.dataset.plotLeft);
+    const plotRight = Number(svg.dataset.plotRight);
+    const width = Number(svg.dataset.width);
+    const bins = battle.distribution.bins;
+    const range = Math.max(1, xMax - xMin);
+    const bandwidth = Math.max(2, range * 0.05);
+
+    const showTooltip = (event) => {
+      const rect = svg.getBoundingClientRect();
+      const svgX = ((event.clientX - rect.left) / rect.width) * width;
+      const margin = xMin + ((svgX - plotLeft) / (plotRight - plotLeft)) * (xMax - xMin);
+
+      let weightSum = 0;
+      let probability = 0;
+      let allyLoss = 0;
+      let enemyLoss = 0;
+      let allySurv = 0;
+      let enemySurv = 0;
+
+      for (const bin of bins) {
+        const distance = bin.value - margin;
+        const kernel = Math.exp(-(distance * distance) / (2 * bandwidth * bandwidth));
+        const weight = bin.probability * kernel;
+        if (weight <= 0) continue;
+
+        weightSum += weight;
+        probability += weight;
+        allyLoss += bin.avgAllyLosses * weight;
+        enemyLoss += bin.avgEnemyLosses * weight;
+        allySurv += bin.avgAllySurvivors * weight;
+        enemySurv += bin.avgEnemySurvivors * weight;
+      }
+
+      if (!weightSum) return;
+
+      tooltip.innerHTML = `
+        <div class="fw-graph-tooltip-title">${game.i18n.localize("FOUNDRY-WAR.battle.advantage")} ${Math.round(margin)}</div>
+        <div><span>${game.i18n.localize("FOUNDRY-WAR.battle.probability")}</span><b>${(probability * 100).toFixed(2)}%</b></div>
+        <div><span>${game.i18n.localize("FOUNDRY-WAR.battle.allyLosses")}</span><b class="ally">${(allyLoss / weightSum).toFixed(1)}</b></div>
+        <div><span>${game.i18n.localize("FOUNDRY-WAR.battle.enemyLosses")}</span><b class="enemy">${(enemyLoss / weightSum).toFixed(1)}</b></div>
+        <div><span>${game.i18n.localize("FOUNDRY-WAR.battle.allyTroops")}</span><b>${(allySurv / weightSum).toFixed(1)}</b></div>
+        <div><span>${game.i18n.localize("FOUNDRY-WAR.battle.enemyTroops")}</span><b>${(enemySurv / weightSum).toFixed(1)}</b></div>
+      `;
+
+      tooltip.classList.add("visible");
+
+      const wrap = svg.parentElement;
+      const wrapRect = wrap.getBoundingClientRect();
+      const left = event.clientX - wrapRect.left + 14;
+      const top = event.clientY - wrapRect.top;
+
+      tooltip.style.left = `${Math.min(left, wrap.clientWidth - 240)}px`;
+      tooltip.style.top = `${top}px`;
+    };
+
+    svg.addEventListener("mousemove", showTooltip);
+    svg.addEventListener("mouseleave", () => tooltip.classList.remove("visible"));
   }
 
   _onClose(options) {
@@ -838,7 +977,11 @@ export class WarPanel extends ApplicationV2 {
     const state = getWarState();
     const entries = { ...state.entries };
     delete entries[entryId];
-    await commitWarState({ ...state, entries });
+    await commitWarState({
+      ...state,
+      entries,
+      battle: { ...state.battle, roll: null },
+    });
   }
 
   static async onSetStance(_event, target) {
@@ -851,12 +994,17 @@ export class WarPanel extends ApplicationV2 {
     await commitWarState({
       ...state,
       stances: { ...state.stances, [team]: nextStance },
+      battle: { ...state.battle, roll: null },
     });
   }
 
   static async onToggleRush() {
     const state = getWarState();
-    await commitWarState({ ...state, rush: !state.rush });
+    await commitWarState({
+      ...state,
+      rush: !state.rush,
+      battle: { ...state.battle, roll: null },
+    });
   }
 
   static async onToggleEffect(_event, target) {
@@ -873,6 +1021,7 @@ export class WarPanel extends ApplicationV2 {
     await commitWarState({
       ...state,
       entries: { ...state.entries, [entryId]: { ...entry, effects } },
+      battle: { ...state.battle, roll: null },
     });
   }
 
@@ -897,6 +1046,7 @@ export class WarPanel extends ApplicationV2 {
     await commitWarState({
       ...state,
       entries: { ...state.entries, [entryId]: { ...entry, cr } },
+      battle: { ...state.battle, roll: null },
     });
   }
 
@@ -910,14 +1060,32 @@ export class WarPanel extends ApplicationV2 {
       return;
     }
 
-    this.battleState = battle;
-    await this.render();
+    this.battleCache = { signature: battle.signature, battle };
+
+    await commitWarState({
+      ...state,
+      battle: { active: true, roll: null },
+    });
   }
 
   static async onRollBattle() {
-    const battle = this.battleState;
-    const bins = battle?.distribution?.bins;
-    if (!bins?.length) return;
+    const state = getWarState();
+    const entries = await resolveEntries(state);
+    const settings = battleSettings();
+    const signature = battleSignature(entries, state, settings);
+
+    let battle =
+      this.battleCache?.signature === signature ? this.battleCache.battle : null;
+
+    if (!battle) {
+      const built = buildBattle(entries, state);
+      if (built.error) return;
+      battle = built;
+      this.battleCache = { signature, battle };
+    }
+
+    const bins = battle.distribution.bins;
+    if (!bins.length) return;
 
     const random = Math.random();
     let cumulative = 0;
@@ -932,35 +1100,51 @@ export class WarPanel extends ApplicationV2 {
     }
 
     const seed = Math.floor(Math.random() * 1e9);
-    const allyRows = distributeLosses(battle.sides.ally, bin.avgAllyLosses, { seed });
-    const enemyRows = distributeLosses(battle.sides.enemy, bin.avgEnemyLosses, {
-      seed: seed + 1,
-    });
 
-    battle.roll = { r: random, bin, allyRows, enemyRows };
-    await this.render();
+    await commitWarState({
+      ...state,
+      battle: {
+        active: true,
+        roll: { r: random, value: bin.value, seed, signature },
+      },
+    });
   }
 
   static async onApplyBattle() {
-    const battle = this.battleState;
-    if (!battle?.roll) return;
+    const state = getWarState();
+    const storedRoll = state.battle.roll;
+    if (!storedRoll) return;
 
-    const entries = [
-      ...battle.roll.allyRows.map((row, index) => ({
-        row,
-        unit: battle.sides.ally[index],
-      })),
-      ...battle.roll.enemyRows.map((row, index) => ({
-        row,
-        unit: battle.sides.enemy[index],
-      })),
+    const entries = await resolveEntries(state);
+    const settings = battleSettings();
+    const signature = battleSignature(entries, state, settings);
+    if (storedRoll.signature !== signature) return;
+
+    const battle = buildBattle(entries, state);
+    if (battle.error) return;
+
+    const bin = battle.distribution.bins.find(
+      (candidate) => candidate.value === storedRoll.value,
+    );
+    if (!bin) return;
+
+    const allyRows = distributeLosses(battle.sides.ally, bin.avgAllyLosses, {
+      seed: storedRoll.seed,
+    });
+    const enemyRows = distributeLosses(battle.sides.enemy, bin.avgEnemyLosses, {
+      seed: storedRoll.seed + 1,
+    });
+
+    const applications = [
+      ...allyRows.map((row, index) => ({ row, unit: battle.sides.ally[index] })),
+      ...enemyRows.map((row, index) => ({ row, unit: battle.sides.enemy[index] })),
     ];
 
     // Se lo stesso attore compare su più token, sommo le perdite e applico
     // una sola volta alle sue HP.
     const byActor = new Map();
 
-    for (const { row, unit } of entries) {
+    for (const { row, unit } of applications) {
       if (!unit?.actor || !row.troopLosses) continue;
 
       const current = byActor.get(unit.actor.uuid) ?? { actor: unit.actor, loss: 0 };
@@ -987,8 +1171,12 @@ export class WarPanel extends ApplicationV2 {
 
     await Promise.all(updates.map(({ actor, value }) => setHP(actor, value)));
 
-    this.battleState = null;
-    await this.render();
+    // La simulazione resta attiva, ma il tiro viene consumato.
+    await commitWarState({
+      ...state,
+      battle: { active: true, roll: null },
+    });
+
     ui.notifications.info(game.i18n.localize("FOUNDRY-WAR.battle.applied"));
   }
 }
@@ -1010,8 +1198,16 @@ export function toggleWarPanel() {
   panelInstance.render({ force: true });
 }
 
+let panelRefreshTimer = null;
+
 export function refreshWarPanel() {
-  if (panelInstance?.rendered) panelInstance.render();
+  if (!panelInstance?.rendered) return;
+
+  clearTimeout(panelRefreshTimer);
+  panelRefreshTimer = setTimeout(() => {
+    panelRefreshTimer = null;
+    if (panelInstance?.rendered) panelInstance.render();
+  }, 150);
 }
 
 /* -------------------------------------------------------------------------- */

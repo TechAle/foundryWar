@@ -101,7 +101,12 @@
       "totalAllies": "Vittoria totale alleati",
       "totalEnemies": "Vittoria totale nemici",
       "rollMarker": "Tiro",
-      "draw": "Pareggio"
+      "draw": "Pareggio",
+      "advantage": "Vantaggio",
+      "allyLosses": "Perdite alleate",
+      "enemyLosses": "Perdite nemiche",
+      "allyTroops": "Truppe alleate",
+      "enemyTroops": "Truppe nemiche"
     },
     "simulate": {
       "allies": "Esperienza alleati: {xp} XP",

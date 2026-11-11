@@ -50,6 +50,11 @@ localizzazione e release automatica su GitHub.
   - **Applica**: sottrae le perdite (in truppe) dalle HP degli attori
   - la tabella **Perdite per unità**: i CR bassi assorbono più danni, ma non
     tutti
+  - **hover** sul grafico: probabilità, perdite e truppe rimaste in quel punto
+- La simulazione e il tiro sono **condivisi** tra i client: il grafico è
+  deterministico dagli stessi dati e il risultato del tiro viene salvato nello
+  stato del pannello. Rush, effetti, CR, stance e roster aggiornano il grafico
+  in tempo reale senza dover ripremere Simula guerra.
 - XP: minimo **50**, arrotondato per difetto.
 - Impostazioni GM del combattimento:
   - **Alpha** (caos per confronto): default `0.15`
