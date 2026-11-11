@@ -19,6 +19,12 @@ Non richiede Foundry né dipendenze npm.
   - `0` → deterministico
   - `0.3` → default
   - `1` → molto casuale
+- `forceCompression` ("compressione") riduce l'impatto del vantaggio numerico:
+  le truppe effettive usate nella simulazione sono `truppe^(1 - compressione × 0.8)`.
+  Più è alta, più truppe servono per ottenere lo stesso vantaggio.
+  - `0` → nessuna compressione
+  - `0.5` → un 10:1 si comporta circa come un 5:1 (85/15)
+  - `1` → compressione massima
 - `battleSigma` ("swing") è l'imprevisto **di battaglia**: un fattore di
   fortuna/morale fisso per tutto lo scontro. Rende meno automatico il vantaggio
   numerico.
@@ -68,6 +74,7 @@ Opzioni:
 | `--runs` | `20000` | battaglie simulate (console); nel report max 8000 |
 | `--alpha` | `0.3` | caos per confronto (0–1) |
 | `--battleSigma` | `0.14` | swing/imprevisto di battaglia (0–2) |
+| `--compression` | `0` | compressione forze: più alta = più truppe per un vantaggio (0–1) |
 | `--rush` | `false` | perdite illimitate iniziali |
 | `--lossCap` | `0.5` | limite perdite senza rush |
 | `--totalThreshold` | `0.85` | vittoria totale: margine / truppe iniziali del vincitore |
@@ -84,6 +91,7 @@ In `sim/out/report.html`:
 - **slider** per alpha
 - **slider** per lo swing (imprevisto di battaglia)
 - **slider** per la soglia di vittoria totale
+- **slider** per la compressione delle forze
 - **checkbox** Rush
 - pulsante **Tira 0–100**: estrae un esito dalla curva (pesato sulle
   probabilità) e disegna la linea verticale dove è uscito

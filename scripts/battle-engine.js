@@ -24,6 +24,7 @@ export const SIGMA_MAX = 0.6;
 export const DEFAULT_ALPHA = 0.3;
 export const DEFAULT_BATTLE_SIGMA = 0.14;
 export const DEFAULT_TOTAL_THRESHOLD = 0.85;
+export const DEFAULT_FORCE_COMPRESSION = 0;
 export const DEFAULT_DICE = 3;
 export const DEFAULT_LOSS_CAP = 0.5;
 export const DEFAULT_DECISIVE_THRESHOLD = 0.95;
@@ -186,33 +187,33 @@ function compareSurvivors(allies, enemies) {
   return allies.remaining > enemies.remaining ? "ally" : "enemy";
 }
 
-function scaleSide(side, scale, lossCap) {
-  if (scale <= 1) return side;
-
-  const count =
-    side.initial > 0 ? Math.max(1, Math.round(side.initial / scale)) : 0;
+function buildSimSide(count, scale, lossCap) {
+  const size = count > 0 ? Math.max(1, Math.round(count / scale)) : 0;
 
   return {
-    ...side,
-    initial: count,
-    remaining: count,
+    initial: size,
+    remaining: size,
     losses: 0,
-    cap: Math.ceil(count * lossCap),
+    cap: Math.ceil(size * lossCap),
   };
 }
 
-function realSide(simSide, original, scale) {
-  if (scale <= 1) {
+function realSide(simSide, original) {
+  if (!simSide.initial) {
     return {
       initial: original.initial,
-      losses: simSide.losses,
-      survivors: simSide.remaining,
+      losses: 0,
+      survivors: original.initial,
       raw: original.raw,
       xp: original.xp,
     };
   }
 
-  const losses = Math.min(original.initial, Math.round(simSide.losses * scale));
+  // I risultati sono nelle unità della simulazione compressa: li riporto
+  // alle truppe effettive reali mantenendo le proporzioni.
+  const factor = original.initial / simSide.initial;
+  const losses = Math.min(original.initial, Math.round(simSide.losses * factor));
+
   return {
     initial: original.initial,
     losses,
@@ -220,6 +221,11 @@ function realSide(simSide, original, scale) {
     raw: original.raw,
     xp: original.xp,
   };
+}
+
+function compressCount(count, exponent) {
+  if (count <= 0) return 0;
+  return Math.max(1, Math.round(Math.pow(count, exponent)));
 }
 
 /**
@@ -254,13 +260,25 @@ export function simulateBattle(config, rng) {
   const allyLuck = battleSigma * truncatedNormal(rng);
   const enemyLuck = battleSigma * truncatedNormal(rng);
 
+  // Compressione delle forze: più è alta, più truppe servono per ottenere lo
+  // stesso vantaggio. 0 = nessuna compressione.
+  const compression = clamp(
+    Number(config.forceCompression ?? DEFAULT_FORCE_COMPRESSION),
+    0,
+    1,
+  );
+  const exponent = 1 - compression * 0.8;
+
+  const combatAllies = compressCount(realAllies.initial, exponent);
+  const combatEnemies = compressCount(realEnemies.initial, exponent);
+
   const scale = Math.max(
     1,
-    Math.ceil(Math.max(realAllies.initial, realEnemies.initial) / MAX_SIM_TROOPS),
+    Math.ceil(Math.max(combatAllies, combatEnemies) / MAX_SIM_TROOPS),
   );
 
-  const allies = scaleSide(realAllies, scale, lossCap);
-  const enemies = scaleSide(realEnemies, scale, lossCap);
+  const allies = buildSimSide(combatAllies, scale, lossCap);
+  const enemies = buildSimSide(combatEnemies, scale, lossCap);
 
   let rounds = 0;
   let winner = null;
@@ -319,13 +337,14 @@ export function simulateBattle(config, rng) {
     else winner = compareSurvivors(allies, enemies);
   }
 
-  const alliesResult = realSide(allies, realAllies, scale);
-  const enemiesResult = realSide(enemies, realEnemies, scale);
+  const alliesResult = realSide(allies, realAllies);
+  const enemiesResult = realSide(enemies, realEnemies);
 
   return {
     winner,
     rounds,
     scale,
+    compression,
     allies: alliesResult,
     enemies: enemiesResult,
     margin: alliesResult.survivors - enemiesResult.survivors,

@@ -21,6 +21,7 @@ import {
   DEFAULT_ALPHA,
   DEFAULT_BATTLE_SIGMA,
   DEFAULT_DICE,
+  DEFAULT_FORCE_COMPRESSION,
   DEFAULT_LOSS_CAP,
   DEFAULT_TOTAL_THRESHOLD,
   MIN_XP,
@@ -68,6 +69,7 @@ const runs = Math.max(1, Math.floor(Number(args.runs ?? 20000)));
 const interactiveRuns = Math.min(runs, 8000);
 const alpha = Number(args.alpha ?? DEFAULT_ALPHA);
 const battleSigma = Number(args.battleSigma ?? DEFAULT_BATTLE_SIGMA);
+const compression = Number(args.compression ?? DEFAULT_FORCE_COMPRESSION);
 const rush = String(args.rush ?? "false") === "true";
 const lossCap = Number(args.lossCap ?? DEFAULT_LOSS_CAP);
 const totalThreshold = Number(args.totalThreshold ?? DEFAULT_TOTAL_THRESHOLD);
@@ -93,6 +95,7 @@ const settings = {
   runs: interactiveRuns,
   alpha,
   battleSigma,
+  compression,
   rush,
   lossCap,
   totalThreshold,
@@ -109,6 +112,7 @@ const config = {
   enemies: [{ cr: enemy.cr, troops: enemy.troops }],
   alpha,
   battleSigma,
+  forceCompression: compression,
   rush,
   lossCap,
   dice,
@@ -127,7 +131,7 @@ console.log(
     `Nemici: ${enemy.troops} truppe CR ${enemy.cr} (= ${effective(enemy)} truppe effettive)`,
 );
 console.log(
-  `alpha=${alpha}  swing=${battleSigma}  rush=${rush}  lossCap=${lossCap}  dice=${dice}  ` +
+  `alpha=${alpha}  swing=${battleSigma}  compressione=${compression}  rush=${rush}  lossCap=${lossCap}  dice=${dice}  ` +
     `vittoria totale >= ${(totalThreshold * 100).toFixed(0)}% del vincitore\n`,
 );
 console.log(`Vittorie alleati: ${pct(distribution.allyWinRate)}`);
@@ -326,7 +330,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
   <p class="sub">
     Muovi gli slider: la curva viene ricalcolata in tempo reale con
     ${settings.runs.toLocaleString("it-IT")} battaglie per punto.
-    alpha ${settings.alpha} · swing ${settings.battleSigma} · rush ${settings.rush ? "ON" : "OFF"} ·
+    alpha ${settings.alpha} · swing ${settings.battleSigma} ·
+    compressione ${settings.compression} · rush ${settings.rush ? "ON" : "OFF"} ·
     limite perdite ${settings.lossCap * 100}% ·
     vittoria totale ≥ ${(settings.totalThreshold * 100).toFixed(0)}% del vincitore
   </p>
@@ -359,6 +364,10 @@ function buildReportHtml({ engineSource, initial, settings }) {
     <div class="control">
       <div class="label"><span>Soglia vittoria totale</span><output id="totalThresholdOut">85%</output></div>
       <input id="totalThreshold" type="range" min="0.5" max="1" step="0.01" value="0.85">
+    </div>
+    <div class="control">
+      <div class="label"><span>Compressione forze</span><output id="compressionOut">0.00</output></div>
+      <input id="compression" type="range" min="0" max="1" step="0.01" value="0">
     </div>
     <div class="control">
       <div class="label"><span>Rush</span></div>
@@ -408,7 +417,9 @@ function buildReportHtml({ engineSource, initial, settings }) {
     iniziali <b>del vincitore</b>. <b>Tira 0–100</b> estrae un esito dalla curva e disegna la linea
     verticale dove è uscito (dorata o rossa se è vittoria totale).
     <b>Swing</b> è l'imprevisto di battaglia: a 0 i numeri dominano; col default 0.14 un 2:1
-    vale circa 72/28 e un 5:1 circa 90/10. Passa il mouse sul grafico per i valori esatti.
+    vale circa 71/29 e un 5:1 circa 89/11. <b>Compressione</b>: più è alta, più truppe
+    servono per ottenere lo stesso vantaggio (0 = off; 0.5 rende un 10:1 circa 85/15).
+    Passa il mouse sul grafico per i valori esatti.
   </p>
 
 <script>
@@ -449,6 +460,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     alpha: INITIAL.settings.alpha,
     swing: INITIAL.settings.battleSigma,
     totalThreshold: INITIAL.settings.totalThreshold,
+    compression: INITIAL.settings.compression,
     rush: INITIAL.settings.rush
   };
 
@@ -460,6 +472,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     alpha: document.getElementById("alpha"),
     swing: document.getElementById("swing"),
     totalThreshold: document.getElementById("totalThreshold"),
+    compression: document.getElementById("compression"),
     rush: document.getElementById("rush"),
     allyTroopsOut: document.getElementById("allyTroopsOut"),
     enemyTroopsOut: document.getElementById("enemyTroopsOut"),
@@ -469,6 +482,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     swingOut: document.getElementById("swingOut"),
     totalThresholdOut: document.getElementById("totalThresholdOut"),
     totalThresholdLabel: document.getElementById("totalThresholdLabel"),
+    compressionOut: document.getElementById("compressionOut"),
     allyWin: document.getElementById("allyWin"),
     enemyWin: document.getElementById("enemyWin"),
     avgLosses: document.getElementById("avgLosses"),
@@ -489,6 +503,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
   els.alpha.value = state.alpha;
   els.swing.value = state.swing;
   els.totalThreshold.value = state.totalThreshold;
+  els.compression.value = state.compression;
   els.rush.checked = state.rush;
 
   function fmtCR(value) {
@@ -509,6 +524,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     els.alphaOut.textContent = Number(state.alpha).toFixed(2);
     els.swingOut.textContent = Number(state.swing).toFixed(2);
     els.totalThresholdOut.textContent = Math.round(state.totalThreshold * 100) + "%";
+    els.compressionOut.textContent = Number(state.compression).toFixed(2);
   }
 
   function readState() {
@@ -520,6 +536,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     state.swing = Number(els.swing.value);
     state.totalThreshold = Number(els.totalThreshold.value);
     THRESHOLD = state.totalThreshold;
+    state.compression = Number(els.compression.value);
     state.rush = els.rush.checked;
   }
 
@@ -529,6 +546,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
       enemies: [{ cr: state.enemyCR, troops: state.enemyTroops }],
       alpha: state.alpha,
       battleSigma: state.swing,
+      forceCompression: state.compression,
       rush: state.rush,
       lossCap: INITIAL.settings.lossCap,
       dice: INITIAL.settings.dice
@@ -925,7 +943,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     timer = setTimeout(recompute, 90);
   }
 
-  ["allyTroops", "enemyTroops", "allyCR", "enemyCR", "alpha", "swing", "totalThreshold"].forEach(function (key) {
+  ["allyTroops", "enemyTroops", "allyCR", "enemyCR", "alpha", "swing", "totalThreshold", "compression"].forEach(function (key) {
     els[key].addEventListener("input", schedule);
   });
   els.rush.addEventListener("change", schedule);
