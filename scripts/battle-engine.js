@@ -22,7 +22,7 @@
 export const MIN_XP = 50;
 export const SIGMA_MAX = 0.6;
 export const DEFAULT_ALPHA = 0.3;
-export const DEFAULT_BATTLE_SIGMA = 0.14;
+export const DEFAULT_BATTLE_SIGMA = 0.12;
 export const DEFAULT_TOTAL_THRESHOLD = 0.85;
 export const DEFAULT_FORCE_COMPRESSION = 0;
 export const DEFAULT_DICE = 3;

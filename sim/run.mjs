@@ -424,11 +424,11 @@ function buildReportHtml({ engineSource, initial, settings }) {
     <div class="control">
       <div class="label">
         <span>Swing (imprevisto)
-          <span class="help" tabindex="0" data-help="Imprevisto fisso per tutta la battaglia (morale, terreno, fortuna). Più è alto, meno contano i numeri. Default 0.14: 2:1 ≈ 71/29, 5:1 ≈ 89/11.">?</span>
+          <span class="help" tabindex="0" data-help="Imprevisto fisso per tutta la battaglia (morale, terreno, fortuna). Più è alto, meno contano i numeri. Default 0.12: 2:1 ≈ 75/25, 5:1 ≈ 93/7. CR1 vs CR2 ≈ 78/22, CR1 vs CR3 ≈ 88/12.">?</span>
         </span>
-        <output id="swingOut">0.14</output>
+        <output id="swingOut">0.12</output>
       </div>
-      <input id="swing" type="range" min="0" max="1" step="0.01" value="0.14">
+      <input id="swing" type="range" min="0" max="1" step="0.01" value="0.12">
     </div>
     <div class="control">
       <div class="label">
@@ -525,8 +525,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
     è la vittoria totale nemici (sconfitta totale alleati). Soglia: margine ≥ 85% delle truppe
     iniziali <b>del vincitore</b>. <b>Tira 0–100</b> estrae un esito dalla curva e disegna la linea
     verticale dove è uscito (dorata o rossa se è vittoria totale).
-    <b>Swing</b> è l'imprevisto di battaglia: a 0 i numeri dominano; col default 0.14 un 2:1
-    vale circa 71/29 e un 5:1 circa 89/11. <b>Compressione</b>: più è alta, più truppe
+    <b>Swing</b> è l'imprevisto di battaglia: a 0 i numeri dominano; col default 0.12 un 2:1
+    vale circa 75/25 e un 5:1 circa 93/7. <b>Compressione</b>: più è alta, più truppe
     servono per ottenere lo stesso vantaggio (0 = off; 0.5 rende un 10:1 circa 85/15).
     Passa il mouse sul grafico per i valori esatti.
   </p>

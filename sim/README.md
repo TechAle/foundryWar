@@ -29,7 +29,9 @@ Non richiede Foundry né dipendenze npm.
   fortuna/morale fisso per tutto lo scontro. Rende meno automatico il vantaggio
   numerico.
   - `0` → i numeri dominano (2:1 ≈ 99/1)
-  - `0.14` → default (2:1 ≈ 71/29, 5:1 ≈ 89/11, 10:1 ≈ 96/4)
+  - `0.12` → default (2:1 ≈ 75/25, 5:1 ≈ 93/7, 10:1 ≈ 98/2)
+    - 10 CR1 vs 10 CR2 → CR2 vince ~78%
+    - 10 CR1 vs 10 CR3 → CR3 vince ~88%
   - `0.5+` → molti upset, ma il lato con più truppe resta favorito
 - Chi perde il confronto perde 1 truppa.
 - `rush = false` limita le perdite cumulative al `lossCap` (default 50%): la
@@ -73,7 +75,7 @@ Opzioni:
 | `--ally` / `--enemy` | `1x10` | valori iniziali degli slider |
 | `--runs` | `20000` | battaglie simulate (console); nel report max 8000 |
 | `--alpha` | `0.3` | caos per confronto (0–1) |
-| `--battleSigma` | `0.14` | swing/imprevisto di battaglia (0–2) |
+| `--battleSigma` | `0.12` | swing/imprevisto di battaglia (0–2) |
 | `--compression` | `0` | compressione forze: più alta = più truppe per un vantaggio (0–1) |
 | `--rush` | `false` | perdite illimitate iniziali |
 | `--lossCap` | `0.5` | limite perdite senza rush |
