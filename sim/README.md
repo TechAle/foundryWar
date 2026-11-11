@@ -66,14 +66,14 @@ node sim/run.mjs --ally "1x16" --enemy "1x10" --alpha 0.5 --lossCap 0.4
 ```
 
 Sintassi unità: `CRxTRUPPE`. Esempio: `1x10` = 10 truppe CR 1.
-Il report interattivo usa **un battaglione per lato**: se passi più voci,
-viene usata la prima.
+Le voci separate da virgola diventano unità separate nel roster
+(es. `1x10,3x2` = 10 truppe CR 1 + 2 truppe CR 3).
 
 Opzioni:
 
 | Opzione | Default | Descrizione |
 | --- | --- | --- |
-| `--ally` / `--enemy` | `1x10` | valori iniziali degli slider |
+| `--ally` / `--enemy` | `1x10` | roster iniziale (voci `CRxTRUPPE` separate da virgola) |
 | `--runs` | `20000` | battaglie simulate (console); nel report max 8000 |
 | `--alpha` | `0.15` | caos per confronto (0–1) |
 | `--battleSigma` | `0.05` | swing/imprevisto di battaglia (0–2) |
@@ -89,8 +89,10 @@ Opzioni:
 
 In `sim/out/report.html` (passa o clicca sul **?** accanto a ogni voce per la spiegazione):
 
-- **slider** per truppe alleate e nemiche (1–200)
-- **slider** per il CR dei due lati (0–20)
+- **roster Alleati** a sinistra e **roster Nemici** a destra
+  - ogni riga: `Truppe | CR | Nome`
+  - `+ Unità` per aggiungere, `×` per rimuovere
+  - totale truppe e truppe effettive aggiornato live
 - **slider** per alpha
 - **slider** per lo swing (imprevisto di battaglia)
 - **slider** per la soglia di vittoria totale
@@ -101,6 +103,9 @@ In `sim/out/report.html` (passa o clicca sul **?** accanto a ogni voce per la sp
 - card **Truppe effettive**: mostra subito `truppe × XP(CR) / 50` per i due lati
 - card **Vittoria totale**: probabilità complessiva che il tiro cada nella zona
   dorata
+- tabella **Perdite per unità**: le perdite totali vengono distribuite tra le
+  unità con peso `effective / (1 + CR)^bias`. I CR bassi assorbono più danni,
+  ma non tutti; l'eventuale eccedenza viene ridistribuita.
 - il grafico si ricalcola in tempo reale (debounce ~90 ms)
 
 Il grafico ha due assi:

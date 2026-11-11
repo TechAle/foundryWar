@@ -138,6 +138,91 @@ export function effectiveTroops(battalions, bonus = 0) {
 }
 
 /**
+ * Distribuisce le perdite totali (in truppe effettive) tra le unità di un lato.
+ *
+ * Le unità a CR basso sono più esposte, ma non assorbono tutto: il peso è
+ * `effective / (1 + cr)^bias`, con un piccolo jitter per evitare che sia
+ * sempre identico. Le perdite non superano mai le truppe effettive dell'unità
+ * e l'eventuale eccedenza viene ridistribuita sulle altre.
+ *
+ * @param {Array<{name?:string,cr:number,troops:number}>} units
+ * @param {number} totalLoss perdite totali in truppe effettive
+ * @param {{bias?:number,randomness?:number,seed?:number}} [options]
+ */
+export function distributeLosses(units, totalLoss, options = {}) {
+  const bias = Math.max(0, Number(options.bias ?? 1));
+  const randomness = Math.max(0, Number(options.randomness ?? 0.25));
+  const rng = createRng(Number(options.seed ?? 0x5eed));
+
+  const rows = (units ?? []).map((unit) => {
+    const cr = Math.max(0, Number(unit.cr ?? 0));
+    const troops = Math.max(0, Math.floor(Number(unit.troops ?? 0)));
+    const perTroop = xpForCR(cr) / MIN_XP;
+    const effective = Math.floor(troops * perTroop);
+
+    return {
+      name: unit.name ?? "",
+      cr,
+      troops,
+      perTroop,
+      effective,
+      losses: 0,
+    };
+  });
+
+  const totalEffective = rows.reduce((sum, row) => sum + row.effective, 0);
+  let remaining = Math.max(0, Math.min(Number(totalLoss) || 0, totalEffective));
+
+  const weights = rows.map((row) => {
+    if (row.effective <= 0) return 0;
+    const base = row.effective / Math.pow(1 + row.cr, bias);
+    const jitter = randomness > 0 ? Math.exp(randomness * truncatedNormal(rng)) : 1;
+    return base * jitter;
+  });
+
+  let active = rows
+    .map((_, index) => index)
+    .filter((index) => rows[index].effective > 0 && weights[index] > 0);
+
+  while (remaining > 1e-9 && active.length) {
+    const totalWeight = active.reduce((sum, index) => sum + weights[index], 0);
+    let consumed = 0;
+
+    for (const index of active) {
+      const row = rows[index];
+      const capacity = row.effective - row.losses;
+      const share = totalWeight > 0 ? (remaining * weights[index]) / totalWeight : 0;
+      const take = Math.min(share, capacity);
+      row.losses += take;
+      consumed += take;
+    }
+
+    remaining -= consumed;
+    active = active.filter((index) => rows[index].effective - rows[index].losses > 1e-9);
+    if (consumed <= 1e-9) break;
+  }
+
+  return rows.map((row) => {
+    const losses = Math.min(row.effective, Math.round(row.losses));
+    const survivors = row.effective - losses;
+    const troopLosses =
+      row.perTroop > 0 ? Math.min(row.troops, Math.round(losses / row.perTroop)) : 0;
+
+    return {
+      name: row.name,
+      cr: row.cr,
+      troops: row.troops,
+      perTroop: row.perTroop,
+      effective: row.effective,
+      losses,
+      survivors,
+      troopLosses,
+      troopSurvivors: row.troops - troopLosses,
+    };
+  });
+}
+
+/**
  * Una vittoria è "totale" quando il margine del vincitore è almeno
  * `threshold` (default 85%) delle truppe iniziali del VINCITORE.
  * In pratica: il vincitore conserva quasi tutto il suo esercito e il perdente

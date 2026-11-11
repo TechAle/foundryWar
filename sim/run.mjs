@@ -76,20 +76,19 @@ const totalThreshold = Number(args.totalThreshold ?? DEFAULT_TOTAL_THRESHOLD);
 const dice = Number(args.dice ?? DEFAULT_DICE);
 const outPath = resolve(String(args.out ?? "sim/out/report.html"));
 
-function initialBattalion(spec, fallbackCR, fallbackTroops) {
-  if (!spec) return { cr: fallbackCR, troops: fallbackTroops };
-  const parsed = parseSpec(spec);
-  if (!parsed.length) return { cr: fallbackCR, troops: fallbackTroops };
-  if (parsed.length > 1) {
-    console.warn(
-      "[sim] Il report interattivo usa un solo battaglione per lato: uso la prima voce della specifica.",
-    );
-  }
-  return parsed[0];
+function initialRoster(spec, label) {
+  const parsed = spec ? parseSpec(spec) : [];
+  const units = parsed.length ? parsed : [{ cr: 1, troops: 10 }];
+
+  return units.map((battalion, index) => ({
+    name: `${label} ${index + 1}`,
+    cr: battalion.cr,
+    troops: battalion.troops,
+  }));
 }
 
-const ally = initialBattalion(args.ally, 1, 10);
-const enemy = initialBattalion(args.enemy, 1, 10);
+const allies = initialRoster(args.ally, "Alleato");
+const enemies = initialRoster(args.enemy, "Nemico");
 
 const settings = {
   runs: interactiveRuns,
@@ -108,8 +107,8 @@ const settings = {
 /* -------------------------------------------------------------------------- */
 
 const config = {
-  allies: [{ cr: ally.cr, troops: ally.troops }],
-  enemies: [{ cr: enemy.cr, troops: enemy.troops }],
+  allies: allies.map(({ cr, troops }) => ({ cr, troops })),
+  enemies: enemies.map(({ cr, troops }) => ({ cr, troops })),
   alpha,
   battleSigma,
   forceCompression: compression,
@@ -122,13 +121,19 @@ const distribution = simulateDistribution(config, runs, settings.seed);
 
 const pct = (value) => `${(value * 100).toFixed(1)}%`;
 const num = (value) => (value == null ? "—" : value.toFixed(1));
-const effective = (battalion) =>
-  Math.floor((battalion.troops * xpForCR(battalion.cr)) / MIN_XP);
+
+function sideSummary(units) {
+  const raw = units.reduce((sum, unit) => sum + unit.troops, 0);
+  const eff = units.reduce(
+    (sum, unit) => sum + Math.floor((unit.troops * xpForCR(unit.cr)) / MIN_XP),
+    0,
+  );
+  return `${raw} truppe (${eff} effettive)`;
+}
 
 console.log(`\nFoundry War — ${runs.toLocaleString("it-IT")} battaglie`);
 console.log(
-  `Alleati: ${ally.troops} truppe CR ${ally.cr} (= ${effective(ally)} truppe effettive) · ` +
-    `Nemici: ${enemy.troops} truppe CR ${enemy.cr} (= ${effective(enemy)} truppe effettive)`,
+  `Alleati: ${sideSummary(allies)} · Nemici: ${sideSummary(enemies)}`,
 );
 console.log(
   `alpha=${alpha}  swing=${battleSigma}  compressione=${compression}  rush=${rush}  lossCap=${lossCap}  dice=${dice}  ` +
@@ -153,7 +158,7 @@ const engineSource = readFileSync(enginePath, "utf8").replace(/^export\s+/gm, ""
 
 const html = buildReportHtml({
   engineSource,
-  initial: { ally, enemy },
+  initial: { allies, enemies },
   settings,
 });
 
@@ -161,7 +166,7 @@ mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, html, "utf8");
 writeFileSync(
   outPath.replace(/\.html?$/i, ".json"),
-  JSON.stringify({ settings, initial: { ally, enemy }, distribution }, null, 2),
+  JSON.stringify({ settings, initial: { allies, enemies }, distribution }, null, 2),
   "utf8",
 );
 
@@ -339,6 +344,88 @@ function buildReportHtml({ engineSource, initial, settings }) {
     font-size: 11px;
     font-weight: 700;
   }
+  .rosters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .roster { padding: 12px 14px; }
+  .roster header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .roster h3 { margin: 0; font-size: 15px; }
+  .add-unit {
+    padding: 4px 9px;
+    color: var(--accent);
+    background: rgba(240,198,116,.12);
+    border: 1px solid rgba(240,198,116,.45);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .add-unit:hover { background: rgba(240,198,116,.24); }
+  .unit-head, .unit-row {
+    display: grid;
+    grid-template-columns: 70px 60px 1fr 28px;
+    gap: 6px;
+    align-items: center;
+  }
+  .unit-head {
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .unit-row { margin-bottom: 5px; }
+  .unit-row input {
+    width: 100%;
+    padding: 4px 6px;
+    color: var(--text);
+    background: #121419;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 12px;
+  }
+  .unit-remove {
+    padding: 2px 0;
+    color: var(--muted);
+    background: none;
+    border: none;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .unit-remove:hover { color: var(--enemy); }
+  .roster-total { margin-top: 8px; color: var(--muted); font-size: 12px; }
+
+  .breakdown { padding: 14px; margin-top: 14px; }
+  .breakdown h3 { margin: 0 0 10px; font-size: 15px; }
+  .breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .breakdown-side h4 { margin: 0 0 6px; font-size: 13px; }
+  .unit-line {
+    display: grid;
+    grid-template-columns: 1fr 40px 50px 55px 55px;
+    gap: 4px;
+    padding: 3px 0;
+    border-bottom: 1px solid #262a31;
+    font-size: 12px;
+  }
+  .unit-line.head {
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+  }
+  .unit-line .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .unit-line .ally { color: var(--ally); font-weight: 600; }
+  .unit-line .enemy { color: var(--enemy); font-weight: 600; }
+
   .chart-wrap { position: relative; padding: 8px 12px 0; }
   svg { display: block; width: 100%; height: auto; }
   .axis text { fill: var(--muted); font-size: 11px; }
@@ -360,6 +447,9 @@ function buildReportHtml({ engineSource, initial, settings }) {
   .tooltip hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
   .note { color: var(--muted); font-size: 12px; margin: 12px 2px 0; }
   .status { color: var(--accent); font-size: 12px; min-height: 16px; margin: 8px 2px 0; }
+  @media (max-width: 700px) {
+    .rosters, .breakdown-grid { grid-template-columns: 1fr; }
+  }
   @media (max-width: 640px) { body { padding: 14px; } }
 </style>
 </head>
@@ -374,43 +464,32 @@ function buildReportHtml({ engineSource, initial, settings }) {
     vittoria totale ≥ ${(settings.totalThreshold * 100).toFixed(0)}% del vincitore
   </p>
 
+  <section class="panel rosters">
+    <div class="roster">
+      <header>
+        <h3>Alleati</h3>
+        <button id="addAlly" class="add-unit" type="button">+ Unità</button>
+      </header>
+      <div class="unit-head">
+        <span>Truppe</span><span>CR</span><span>Nome</span><span></span>
+      </div>
+      <div id="allyRoster" class="unit-list"></div>
+      <div class="roster-total" id="allyTotal">—</div>
+    </div>
+    <div class="roster">
+      <header>
+        <h3>Nemici</h3>
+        <button id="addEnemy" class="add-unit" type="button">+ Unità</button>
+      </header>
+      <div class="unit-head">
+        <span>Truppe</span><span>CR</span><span>Nome</span><span></span>
+      </div>
+      <div id="enemyRoster" class="unit-list"></div>
+      <div class="roster-total" id="enemyTotal">—</div>
+    </div>
+  </section>
+
   <section class="panel controls">
-    <div class="control">
-      <div class="label">
-        <span>Truppe alleate
-          <span class="help" tabindex="0" data-help="Numero di truppe (HP) del battaglione. Vengono convertite in truppe effettive: truppe × XP(CR) / 50.">?</span>
-        </span>
-        <output id="allyTroopsOut">10</output>
-      </div>
-      <input id="allyTroops" type="range" min="1" max="200" step="1" value="10">
-    </div>
-    <div class="control">
-      <div class="label">
-        <span>Truppe nemiche
-          <span class="help" tabindex="0" data-help="Numero di truppe (HP) del battaglione. Vengono convertite in truppe effettive: truppe × XP(CR) / 50.">?</span>
-        </span>
-        <output id="enemyTroopsOut">10</output>
-      </div>
-      <input id="enemyTroops" type="range" min="1" max="200" step="1" value="10">
-    </div>
-    <div class="control">
-      <div class="label">
-        <span>CR alleati
-          <span class="help" tabindex="0" data-help="Challenge Rating per truppa. Determina l'XP e quindi le truppe effettive: CR 1 = 4, CR 2 = 9, CR 5 = 36 per truppa.">?</span>
-        </span>
-        <output id="allyCROut">1</output>
-      </div>
-      <input id="allyCR" type="range" min="0" max="20" step="0.5" value="1">
-    </div>
-    <div class="control">
-      <div class="label">
-        <span>CR nemici
-          <span class="help" tabindex="0" data-help="Challenge Rating per truppa. Determina l'XP e quindi le truppe effettive: CR 1 = 4, CR 2 = 9, CR 5 = 36 per truppa.">?</span>
-        </span>
-        <output id="enemyCROut">1</output>
-      </div>
-      <input id="enemyCR" type="range" min="0" max="20" step="0.5" value="1">
-    </div>
     <div class="control">
       <div class="label">
         <span>Alpha (caos)
@@ -531,6 +610,13 @@ function buildReportHtml({ engineSource, initial, settings }) {
     Passa il mouse sul grafico per i valori esatti.
   </p>
 
+  <div class="panel breakdown">
+    <h3>Perdite per unità
+      <span class="help" tabindex="0" data-help="Le perdite totali vengono distribuite tra le unità: i CR bassi assorbono più danni, ma non tutti. La tabella mostra i valori medi (o quelli del tiro, se hai tirato).">?</span>
+    </h3>
+    <div class="breakdown-grid" id="breakdown"></div>
+  </div>
+
 <div class="help-tip" id="helpTip"></div>
 
 <script>
@@ -544,6 +630,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     resolveBattle: resolveBattle,
     createRng: createRng,
     effectiveTroops: effectiveTroops,
+    distributeLosses: distributeLosses,
     isTotalVictory: isTotalVictory,
     totalVictoryProbability: totalVictoryProbability,
     totalVictoryRates: totalVictoryRates
@@ -556,18 +643,26 @@ function buildReportHtml({ engineSource, initial, settings }) {
   "use strict";
 
   var Engine = window.FWEngine;
-  var INITIAL = ${JSON.stringify({ ally: initial.ally, enemy: initial.enemy, settings })};
+  var INITIAL = ${JSON.stringify({ allies: initial.allies, enemies: initial.enemies, settings })};
   var RUNS = INITIAL.settings.runs;
   var SEED = INITIAL.settings.seed;
   var THRESHOLD = INITIAL.settings.totalThreshold;
   var lastDistribution = null;
   var lastRoll = null;
 
+  function cloneUnits(units) {
+    return (units || []).map(function (unit, index) {
+      return {
+        name: unit.name || "Unità " + (index + 1),
+        cr: Math.max(0, Number(unit.cr ?? 1)),
+        troops: Math.max(0, Math.floor(Number(unit.troops ?? 0)))
+      };
+    });
+  }
+
   var state = {
-    allyTroops: INITIAL.ally.troops,
-    enemyTroops: INITIAL.enemy.troops,
-    allyCR: INITIAL.ally.cr,
-    enemyCR: INITIAL.enemy.cr,
+    allies: cloneUnits(INITIAL.allies),
+    enemies: cloneUnits(INITIAL.enemies),
     alpha: INITIAL.settings.alpha,
     swing: INITIAL.settings.battleSigma,
     totalThreshold: INITIAL.settings.totalThreshold,
@@ -576,24 +671,23 @@ function buildReportHtml({ engineSource, initial, settings }) {
   };
 
   var els = {
-    allyTroops: document.getElementById("allyTroops"),
-    enemyTroops: document.getElementById("enemyTroops"),
-    allyCR: document.getElementById("allyCR"),
-    enemyCR: document.getElementById("enemyCR"),
     alpha: document.getElementById("alpha"),
     swing: document.getElementById("swing"),
     totalThreshold: document.getElementById("totalThreshold"),
     compression: document.getElementById("compression"),
     rush: document.getElementById("rush"),
-    allyTroopsOut: document.getElementById("allyTroopsOut"),
-    enemyTroopsOut: document.getElementById("enemyTroopsOut"),
-    allyCROut: document.getElementById("allyCROut"),
-    enemyCROut: document.getElementById("enemyCROut"),
     alphaOut: document.getElementById("alphaOut"),
     swingOut: document.getElementById("swingOut"),
     totalThresholdOut: document.getElementById("totalThresholdOut"),
     totalThresholdLabel: document.getElementById("totalThresholdLabel"),
     compressionOut: document.getElementById("compressionOut"),
+    allyRoster: document.getElementById("allyRoster"),
+    enemyRoster: document.getElementById("enemyRoster"),
+    allyTotal: document.getElementById("allyTotal"),
+    enemyTotal: document.getElementById("enemyTotal"),
+    addAlly: document.getElementById("addAlly"),
+    addEnemy: document.getElementById("addEnemy"),
+    breakdown: document.getElementById("breakdown"),
     allyWin: document.getElementById("allyWin"),
     enemyWin: document.getElementById("enemyWin"),
     avgLosses: document.getElementById("avgLosses"),
@@ -607,31 +701,98 @@ function buildReportHtml({ engineSource, initial, settings }) {
   };
 
   /* Sync iniziale */
-  els.allyTroops.value = state.allyTroops;
-  els.enemyTroops.value = state.enemyTroops;
-  els.allyCR.value = state.allyCR;
-  els.enemyCR.value = state.enemyCR;
   els.alpha.value = state.alpha;
   els.swing.value = state.swing;
   els.totalThreshold.value = state.totalThreshold;
   els.compression.value = state.compression;
   els.rush.checked = state.rush;
 
-  function fmtCR(value) {
-    return Number(value).toFixed(1).replace(/\\.0$/, "");
+  function escapeAttr(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
-  function effectiveTroops(troops, cr) {
-    return Math.floor((troops * Engine.xpForCR(cr)) / 50);
+  function rosterSummary(units) {
+    var raw = 0;
+    var effective = 0;
+
+    units.forEach(function (unit) {
+      raw += unit.troops;
+      effective += Math.floor((unit.troops * Engine.xpForCR(unit.cr)) / 50);
+    });
+
+    return { raw: raw, effective: effective };
+  }
+
+  function updateTotals() {
+    var allies = rosterSummary(state.allies);
+    var enemies = rosterSummary(state.enemies);
+
+    els.allyTotal.textContent =
+      allies.raw + " truppe · " + allies.effective.toLocaleString("it-IT") + " eff.";
+    els.enemyTotal.textContent =
+      enemies.raw + " truppe · " + enemies.effective.toLocaleString("it-IT") + " eff.";
+  }
+
+  function renderRoster(side) {
+    var container = side === "allies" ? els.allyRoster : els.enemyRoster;
+    container.innerHTML = "";
+
+    state[side].forEach(function (unit, index) {
+      var row = document.createElement("div");
+      row.className = "unit-row";
+      row.dataset.side = side;
+      row.dataset.index = String(index);
+      row.innerHTML =
+        '<input class="unit-troops" type="number" min="0" max="9999" step="1" value="' + unit.troops + '" title="Truppe (HP)">' +
+        '<input class="unit-cr" type="number" min="0" max="30" step="0.5" value="' + unit.cr + '" title="CR">' +
+        '<input class="unit-name" type="text" value="' + escapeAttr(unit.name) + '" title="Nome">' +
+        '<button class="unit-remove" type="button" title="Rimuovi">×</button>';
+      container.appendChild(row);
+    });
+
+    updateTotals();
+  }
+
+  function bindRoster(side) {
+    var container = side === "allies" ? els.allyRoster : els.enemyRoster;
+
+    container.addEventListener("input", function (event) {
+      var row = event.target.closest(".unit-row");
+      if (!row) return;
+
+      var unit = state[side][Number(row.dataset.index)];
+      if (!unit) return;
+
+      if (event.target.classList.contains("unit-troops")) {
+        unit.troops = Math.max(0, Math.floor(Number(event.target.value) || 0));
+      } else if (event.target.classList.contains("unit-cr")) {
+        unit.cr = Math.max(0, Number(event.target.value) || 0);
+      } else if (event.target.classList.contains("unit-name")) {
+        unit.name = event.target.value;
+      }
+
+      updateTotals();
+      schedule();
+    });
+
+    container.addEventListener("click", function (event) {
+      var button = event.target.closest(".unit-remove");
+      if (!button) return;
+
+      var index = Number(button.closest(".unit-row").dataset.index);
+      if (state[side].length <= 1) return;
+
+      state[side].splice(index, 1);
+      renderRoster(side);
+      schedule();
+    });
   }
 
   function syncOutputs() {
-    els.allyTroopsOut.textContent =
-      state.allyTroops + " → " + effectiveTroops(state.allyTroops, state.allyCR) + " eff.";
-    els.enemyTroopsOut.textContent =
-      state.enemyTroops + " → " + effectiveTroops(state.enemyTroops, state.enemyCR) + " eff.";
-    els.allyCROut.textContent = fmtCR(state.allyCR);
-    els.enemyCROut.textContent = fmtCR(state.enemyCR);
     els.alphaOut.textContent = Number(state.alpha).toFixed(2);
     els.swingOut.textContent = Number(state.swing).toFixed(2);
     els.totalThresholdOut.textContent = Math.round(state.totalThreshold * 100) + "%";
@@ -639,10 +800,6 @@ function buildReportHtml({ engineSource, initial, settings }) {
   }
 
   function readState() {
-    state.allyTroops = Number(els.allyTroops.value);
-    state.enemyTroops = Number(els.enemyTroops.value);
-    state.allyCR = Number(els.allyCR.value);
-    state.enemyCR = Number(els.enemyCR.value);
     state.alpha = Number(els.alpha.value);
     state.swing = Number(els.swing.value);
     state.totalThreshold = Number(els.totalThreshold.value);
@@ -653,8 +810,12 @@ function buildReportHtml({ engineSource, initial, settings }) {
 
   function configFromState() {
     return {
-      allies: [{ cr: state.allyCR, troops: state.allyTroops }],
-      enemies: [{ cr: state.enemyCR, troops: state.enemyTroops }],
+      allies: state.allies.map(function (unit) {
+        return { cr: unit.cr, troops: unit.troops };
+      }),
+      enemies: state.enemies.map(function (unit) {
+        return { cr: unit.cr, troops: unit.troops };
+      }),
       alpha: state.alpha,
       battleSigma: state.swing,
       forceCompression: state.compression,
@@ -1060,8 +1221,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
 
   function updateCards(distribution) {
     var avg = distribution.average;
-    var allyEff = effectiveTroops(state.allyTroops, state.allyCR);
-    var enemyEff = effectiveTroops(state.enemyTroops, state.enemyCR);
+    var allyEff = rosterSummary(state.allies).effective;
+    var enemyEff = rosterSummary(state.enemies).effective;
 
     els.allyWin.textContent = (distribution.allyWinRate * 100).toFixed(1) + "%";
     els.enemyWin.textContent = (distribution.enemyWinRate * 100).toFixed(1) + "%";
@@ -1086,14 +1247,59 @@ function buildReportHtml({ engineSource, initial, settings }) {
         (rates.enemy * 100).toFixed(1) + '%</span>';
   }
 
+  function renderBreakdownSide(title, rows, side) {
+    var head =
+      '<div class="unit-line head"><span>Nome</span><span>CR</span><span>Truppe</span><span>Perdite</span><span>Restano</span></div>';
+
+    var body = rows
+      .map(function (row) {
+        return (
+          '<div class="unit-line">' +
+          '<span class="name" title="' + escapeAttr(row.name) + '">' + escapeAttr(row.name) + '</span>' +
+          '<span>' + row.cr + '</span>' +
+          '<span>' + row.troops + '</span>' +
+          '<span class="' + side + '">' + row.troopLosses + '</span>' +
+          '<span>' + row.troopSurvivors + '</span>' +
+          '</div>'
+        );
+      })
+      .join("");
+
+    return (
+      '<div class="breakdown-side"><h4>' + title + '</h4>' + head + body + '</div>'
+    );
+  }
+
+  function renderBreakdown(distribution, roll) {
+    if (!distribution) {
+      els.breakdown.innerHTML = "";
+      return;
+    }
+
+    var allyLoss = roll ? roll.bin.avgAllyLosses : distribution.average.allies.losses;
+    var enemyLoss = roll ? roll.bin.avgEnemyLosses : distribution.average.enemies.losses;
+    var seedBase = roll ? Math.floor(Math.random() * 1e9) : 101;
+
+    var allyRows = Engine.distributeLosses(state.allies, allyLoss, { seed: seedBase });
+    var enemyRows = Engine.distributeLosses(state.enemies, enemyLoss, {
+      seed: seedBase + 1,
+    });
+
+    els.breakdown.innerHTML =
+      renderBreakdownSide("Alleati", allyRows, "ally") +
+      renderBreakdownSide("Nemici", enemyRows, "enemy");
+  }
+
   function recompute() {
     var distribution = Engine.simulateDistribution(configFromState(), RUNS, SEED);
     lastDistribution = distribution;
     updateCards(distribution);
     render(distribution);
+    renderBreakdown(distribution, null);
     els.status.textContent =
-      "Aggiornato: " + state.allyTroops + " vs " + state.enemyTroops +
-      " truppe · " + RUNS.toLocaleString("it-IT") + " battaglie";
+      "Aggiornato: " + rosterSummary(state.allies).effective + " vs " +
+      rosterSummary(state.enemies).effective + " truppe effettive · " +
+      RUNS.toLocaleString("it-IT") + " battaglie";
   }
 
   function doRoll() {
@@ -1114,6 +1320,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
     lastRoll = { r: r, bin: bin };
     render(lastDistribution);
     showRollResult(lastDistribution, lastRoll);
+    renderBreakdown(lastDistribution, lastRoll);
   }
 
   function showRollResult(distribution, roll) {
@@ -1155,11 +1362,36 @@ function buildReportHtml({ engineSource, initial, settings }) {
     timer = setTimeout(recompute, 90);
   }
 
-  ["allyTroops", "enemyTroops", "allyCR", "enemyCR", "alpha", "swing", "totalThreshold", "compression"].forEach(function (key) {
+  ["alpha", "swing", "totalThreshold", "compression"].forEach(function (key) {
     els[key].addEventListener("input", schedule);
   });
   els.rush.addEventListener("change", schedule);
   els.rollBtn.addEventListener("click", doRoll);
+
+  bindRoster("allies");
+  bindRoster("enemies");
+  renderRoster("allies");
+  renderRoster("enemies");
+
+  els.addAlly.addEventListener("click", function () {
+    state.allies.push({
+      name: "Alleato " + (state.allies.length + 1),
+      cr: 1,
+      troops: 10
+    });
+    renderRoster("allies");
+    schedule();
+  });
+
+  els.addEnemy.addEventListener("click", function () {
+    state.enemies.push({
+      name: "Nemico " + (state.enemies.length + 1),
+      cr: 1,
+      troops: 10
+    });
+    renderRoster("enemies");
+    schedule();
+  });
 
   /* Tooltip dei "?" */
   var helpTip = document.getElementById("helpTip");
