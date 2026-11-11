@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "check": "node tools/validate.mjs",
+    "sim": "node sim/run.mjs",
+    "serve": "node sim/serve.mjs",
     "zip": "rm -f module.zip && zip -r module.zip module.json scripts styles lang README.md LICENSE -x '*.DS_Store'"
   }
 }

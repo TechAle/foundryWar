@@ -127,6 +127,14 @@ Il report si apre nel browser:
 open sim/out/report.html        # macOS
 ```
 
+Oppure, per servirlo con un server locale Node (utile se il browser blocca
+`file://` o vuoi ricaricare senza riaprire il file):
+
+```bash
+node sim/serve.mjs              # http://127.0.0.1:8765/report.html
+node sim/serve.mjs 3000         # porta personalizzata
+```
+
 ## Note
 
 - Il grafico e la risoluzione usano lo **stesso** motore: il grafico non può
