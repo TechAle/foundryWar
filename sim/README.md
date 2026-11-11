@@ -84,7 +84,7 @@ Opzioni:
 
 ## Report interattivo
 
-In `sim/out/report.html`:
+In `sim/out/report.html` (passa o clicca sul **?** accanto a ogni voce per la spiegazione):
 
 - **slider** per truppe alleate e nemiche (1–200)
 - **slider** per il CR dei due lati (0–20)

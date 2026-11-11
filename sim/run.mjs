@@ -259,6 +259,45 @@ function buildReportHtml({ engineSource, initial, settings }) {
     font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
     background: rgba(240,198,116,.15); color: var(--accent); border: 1px solid rgba(240,198,116,.4);
   }
+  .help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-left: 4px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    vertical-align: middle;
+    cursor: help;
+    user-select: none;
+  }
+  .help:hover,
+  .help:focus {
+    color: var(--accent);
+    border-color: var(--accent);
+    outline: none;
+  }
+  .help-tip {
+    position: fixed;
+    display: none;
+    max-width: 300px;
+    padding: 10px 12px;
+    background: #101217f5;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.4;
+    box-shadow: 0 12px 30px #0009;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .help-tip.visible { display: block; }
   .roll-btn {
     padding: 8px 12px;
     background: rgba(240,198,116,.14);
@@ -338,43 +377,91 @@ function buildReportHtml({ engineSource, initial, settings }) {
 
   <section class="panel controls">
     <div class="control">
-      <div class="label"><span>Truppe alleate</span><output id="allyTroopsOut">10</output></div>
+      <div class="label">
+        <span>Truppe alleate
+          <span class="help" tabindex="0" data-help="Numero di truppe (HP) del battaglione. Vengono convertite in truppe effettive: truppe × XP(CR) / 50.">?</span>
+        </span>
+        <output id="allyTroopsOut">10</output>
+      </div>
       <input id="allyTroops" type="range" min="1" max="200" step="1" value="10">
     </div>
     <div class="control">
-      <div class="label"><span>Truppe nemiche</span><output id="enemyTroopsOut">10</output></div>
+      <div class="label">
+        <span>Truppe nemiche
+          <span class="help" tabindex="0" data-help="Numero di truppe (HP) del battaglione. Vengono convertite in truppe effettive: truppe × XP(CR) / 50.">?</span>
+        </span>
+        <output id="enemyTroopsOut">10</output>
+      </div>
       <input id="enemyTroops" type="range" min="1" max="200" step="1" value="10">
     </div>
     <div class="control">
-      <div class="label"><span>CR alleati</span><output id="allyCROut">1</output></div>
+      <div class="label">
+        <span>CR alleati
+          <span class="help" tabindex="0" data-help="Challenge Rating per truppa. Determina l'XP e quindi le truppe effettive: CR 1 = 4, CR 2 = 9, CR 5 = 36 per truppa.">?</span>
+        </span>
+        <output id="allyCROut">1</output>
+      </div>
       <input id="allyCR" type="range" min="0" max="20" step="0.5" value="1">
     </div>
     <div class="control">
-      <div class="label"><span>CR nemici</span><output id="enemyCROut">1</output></div>
+      <div class="label">
+        <span>CR nemici
+          <span class="help" tabindex="0" data-help="Challenge Rating per truppa. Determina l'XP e quindi le truppe effettive: CR 1 = 4, CR 2 = 9, CR 5 = 36 per truppa.">?</span>
+        </span>
+        <output id="enemyCROut">1</output>
+      </div>
       <input id="enemyCR" type="range" min="0" max="20" step="0.5" value="1">
     </div>
     <div class="control">
-      <div class="label"><span>Alpha (caos)</span><output id="alphaOut">0.30</output></div>
+      <div class="label">
+        <span>Alpha (caos)
+          <span class="help" tabindex="0" data-help="Caos per ogni singolo confronto. 0 = deterministico, 0.3 = default, 1 = molto casuale. Cambia le perdite, non chi vince.">?</span>
+        </span>
+        <output id="alphaOut">0.30</output>
+      </div>
       <input id="alpha" type="range" min="0" max="1" step="0.05" value="0.3">
     </div>
     <div class="control">
-      <div class="label"><span>Swing (imprevisto)</span><output id="swingOut">0.14</output></div>
+      <div class="label">
+        <span>Swing (imprevisto)
+          <span class="help" tabindex="0" data-help="Imprevisto fisso per tutta la battaglia (morale, terreno, fortuna). Più è alto, meno contano i numeri. Default 0.14: 2:1 ≈ 71/29, 5:1 ≈ 89/11.">?</span>
+        </span>
+        <output id="swingOut">0.14</output>
+      </div>
       <input id="swing" type="range" min="0" max="1" step="0.01" value="0.14">
     </div>
     <div class="control">
-      <div class="label"><span>Soglia vittoria totale</span><output id="totalThresholdOut">85%</output></div>
+      <div class="label">
+        <span>Soglia vittoria totale
+          <span class="help" tabindex="0" data-help="Il margine del vincitore deve raggiungere questa percentuale delle SUE truppe iniziali. Default 85%: 10:1 dà circa 70% di vittorie totali.">?</span>
+        </span>
+        <output id="totalThresholdOut">85%</output>
+      </div>
       <input id="totalThreshold" type="range" min="0.5" max="1" step="0.01" value="0.85">
     </div>
     <div class="control">
-      <div class="label"><span>Compressione forze</span><output id="compressionOut">0.00</output></div>
+      <div class="label">
+        <span>Compressione forze
+          <span class="help" tabindex="0" data-help="Comprime il vantaggio numerico: più è alta, più truppe servono per ottenere lo stesso vantaggio. 0 = nessuna compressione, 0.5 rende un 10:1 circa 84/16.">?</span>
+        </span>
+        <output id="compressionOut">0.00</output>
+      </div>
       <input id="compression" type="range" min="0" max="1" step="0.01" value="0">
     </div>
     <div class="control">
-      <div class="label"><span>Rush</span></div>
+      <div class="label">
+        <span>Rush
+          <span class="help" tabindex="0" data-help="Se attivo, le perdite non sono limitate al 50%: si combatte fino allo sterminio di un lato.">?</span>
+        </span>
+      </div>
       <label class="inline"><input id="rush" type="checkbox"> perdite illimitate</label>
     </div>
     <div class="control">
-      <div class="label"><span>Tiro dell'esito</span></div>
+      <div class="label">
+        <span>Tiro dell'esito
+          <span class="help" tabindex="0" data-help="Estrae un esito pesato sulla curva (percentile 0-100) e disegna la linea verticale dove è caduto.">?</span>
+        </span>
+      </div>
       <button id="rollBtn" class="roll-btn" type="button">
         <i>🎲</i> Tira 0–100
       </button>
@@ -382,12 +469,34 @@ function buildReportHtml({ engineSource, initial, settings }) {
   </section>
 
   <div class="cards">
-    <div class="card panel"><div class="k">Vittoria alleati</div><div class="v" id="allyWin">—</div></div>
-    <div class="card panel"><div class="k">Vittoria nemici</div><div class="v" id="enemyWin">—</div></div>
-    <div class="card panel"><div class="k">Perdite medie (eff.)</div><div class="v" id="avgLosses">—</div></div>
-    <div class="card panel"><div class="k">Truppe effettive</div><div class="v" id="effective">—</div></div>
     <div class="card panel">
-      <div class="k">Vittoria totale</div>
+      <div class="k">Vittoria alleati
+        <span class="help" tabindex="0" data-help="Probabilità che il tiro finisca in un esito vinto dagli alleati.">?</span>
+      </div>
+      <div class="v" id="allyWin">—</div>
+    </div>
+    <div class="card panel">
+      <div class="k">Vittoria nemici
+        <span class="help" tabindex="0" data-help="Probabilità che il tiro finisca in un esito vinto dai nemici.">?</span>
+      </div>
+      <div class="v" id="enemyWin">—</div>
+    </div>
+    <div class="card panel">
+      <div class="k">Perdite medie (eff.)
+        <span class="help" tabindex="0" data-help="Perdite medie in truppe effettive su tutte le battaglie simulate.">?</span>
+      </div>
+      <div class="v" id="avgLosses">—</div>
+    </div>
+    <div class="card panel">
+      <div class="k">Truppe effettive
+        <span class="help" tabindex="0" data-help="truppe × XP(CR) / 50. CR 1 = 4 per truppa, CR 2 = 9, CR 5 = 36.">?</span>
+      </div>
+      <div class="v" id="effective">—</div>
+    </div>
+    <div class="card panel">
+      <div class="k">Vittoria totale
+        <span class="help" tabindex="0" data-help="Probabilità che il margine raggiunga la soglia del vincitore. A = alleati, N = nemici.">?</span>
+      </div>
       <div class="v" id="totalChance">—</div>
       <div class="k" id="totalThresholdLabel" style="margin-top:4px">≥ ${(settings.totalThreshold * 100).toFixed(0)}% del vincitore</div>
     </div>
@@ -421,6 +530,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
     servono per ottenere lo stesso vantaggio (0 = off; 0.5 rende un 10:1 circa 85/15).
     Passa il mouse sul grafico per i valori esatti.
   </p>
+
+<div class="help-tip" id="helpTip"></div>
 
 <script>
 (function () {
@@ -948,6 +1059,50 @@ function buildReportHtml({ engineSource, initial, settings }) {
   });
   els.rush.addEventListener("change", schedule);
   els.rollBtn.addEventListener("click", doRoll);
+
+  /* Tooltip dei "?" */
+  var helpTip = document.getElementById("helpTip");
+
+  function showHelp(target) {
+    var rect = target.getBoundingClientRect();
+    var width = Math.min(300, window.innerWidth - 24);
+    helpTip.textContent = target.dataset.help || "";
+    helpTip.style.maxWidth = width + "px";
+    helpTip.style.left =
+      Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)) + "px";
+    helpTip.style.top = rect.bottom + 8 + "px";
+    helpTip.classList.add("visible");
+  }
+
+  function hideHelp() {
+    helpTip.classList.remove("visible");
+  }
+
+  document.addEventListener("mouseover", function (event) {
+    var target = event.target.closest && event.target.closest(".help");
+    if (target) showHelp(target);
+  });
+  document.addEventListener("mouseout", function (event) {
+    var target = event.target.closest && event.target.closest(".help");
+    if (target) hideHelp();
+  });
+  document.addEventListener("focusin", function (event) {
+    var target = event.target.closest && event.target.closest(".help");
+    if (target) showHelp(target);
+  });
+  document.addEventListener("focusout", function (event) {
+    var target = event.target.closest && event.target.closest(".help");
+    if (target) hideHelp();
+  });
+  document.addEventListener("click", function (event) {
+    var target = event.target.closest && event.target.closest(".help");
+    if (!target) return;
+    event.preventDefault();
+    if (helpTip.classList.contains("visible")) hideHelp();
+    else showHelp(target);
+  });
+  window.addEventListener("scroll", hideHelp, { passive: true });
+  window.addEventListener("resize", hideHelp);
 
   syncOutputs();
   recompute();
