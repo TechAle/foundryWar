@@ -676,12 +676,43 @@ function buildReportHtml({ engineSource, initial, settings }) {
     return node;
   }
 
-  function smooth(bins, get) {
-    return bins.map(function (bin, i) {
-      var prev = bins[i - 1] ? get(bins[i - 1]) : get(bin);
-      var next = bins[i + 1] ? get(bins[i + 1]) : get(bin);
-      return (prev + get(bin) * 2 + next) / 4;
+  /*
+   * KDE gaussiana: sparpaglia la probabilità di ogni bin sui margini vicini.
+   * Smussa molto di più della media a 3 punti e riempie anche i "buchi"
+   * tra un margine intero e l'altro.
+   */
+  function smoothProbabilities(bins, min, max) {
+    var range = Math.max(1, max - min);
+    var bandwidth = Math.max(2, range * 0.05);
+    var radius = Math.ceil(bandwidth * 3);
+    var grid = new Map();
+
+    for (var v = Math.ceil(min); v <= Math.floor(max); v++) grid.set(v, 0);
+
+    bins.forEach(function (bin) {
+      var weights = [];
+      var weightSum = 0;
+
+      for (var d = -radius; d <= radius; d++) {
+        var value = bin.value + d;
+        if (!grid.has(value)) continue;
+        var weight = Math.exp(-(d * d) / (2 * bandwidth * bandwidth));
+        weights.push([value, weight]);
+        weightSum += weight;
+      }
+
+      if (!weightSum) return;
+
+      weights.forEach(function (pair) {
+        grid.set(pair[0], grid.get(pair[0]) + (bin.probability * pair[1]) / weightSum);
+      });
     });
+
+    return Array.from(grid.entries())
+      .sort(function (a, b) { return a[0] - b[0]; })
+      .map(function (pair) {
+        return { value: pair[0], probability: pair[1] };
+      });
   }
 
   var lastRender = null;
@@ -697,7 +728,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
     var xMin = Math.min.apply(null, xValues.concat([0])) - 1;
     var xMax = Math.max.apply(null, xValues.concat([0])) + 1;
 
-    var probValues = smooth(bins, function (b) { return b.probability; });
+    var smoothed = smoothProbabilities(bins, xMin, xMax);
+    var probValues = smoothed.map(function (point) { return point.probability; });
     var lossValues = bins.map(function (b) {
       return Math.max(b.avgAllyLosses, b.avgEnemyLosses);
     });
@@ -833,8 +865,8 @@ function buildReportHtml({ engineSource, initial, settings }) {
     );
 
     /* Probabilità: area + linea */
-    var probPoints = bins.map(function (bin, idx) {
-      return [xScale(bin.value), yProb(probValues[idx])];
+    var probPoints = smoothed.map(function (point) {
+      return [xScale(point.value), yProb(point.probability)];
     });
 
     if (probPoints.length) {
