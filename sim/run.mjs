@@ -943,25 +943,6 @@ function buildReportHtml({ engineSource, initial, settings }) {
       false,
     );
 
-    /* Fascia di pareggio */
-    if (state.drawBand > 0) {
-      var drawX1 = Math.max(M.left, xScale(-state.drawBand));
-      var drawX2 = Math.min(W - M.right, xScale(state.drawBand));
-      if (drawX2 - drawX1 > 1) {
-        svg.appendChild(el("rect", {
-          x: drawX1, y: M.top, width: drawX2 - drawX1,
-          height: H - M.top - M.bottom,
-          fill: "#9aa1ad", opacity: "0.08"
-        }));
-        var drawLabel = el("text", {
-          x: (drawX1 + drawX2) / 2, y: M.top + 14,
-          "text-anchor": "middle", "class": "zone-label", fill: "#9aa1ad"
-        });
-        drawLabel.textContent = "pareggio ±" + state.drawBand;
-        svg.appendChild(drawLabel);
-      }
-    }
-
     /* Probabilità: area + linea */
     var probPoints = smoothed.map(function (point) {
       return [xScale(point.value), yProb(point.probability)];
@@ -1042,21 +1023,12 @@ function buildReportHtml({ engineSource, initial, settings }) {
 
     var chartWrap = svg.parentElement;
 
-    function binAt(value) {
-      for (var k = 0; k < bins.length; k++) {
-        if (bins[k].value === value) return bins[k];
-      }
-      return null;
-    }
-
     function formatProbability(probability) {
       if (probability <= 0) return "0%";
       if (probability < 0.0001) return "<0.01%";
       if (probability < 0.001) return (probability * 100).toFixed(3) + "%";
       return (probability * 100).toFixed(2) + "%";
     }
-
-    var drawBin = binAt(0);
 
     svg.onmousemove = function (event) {
       var rect = svg.getBoundingClientRect();
@@ -1076,29 +1048,12 @@ function buildReportHtml({ engineSource, initial, settings }) {
       var allySurv = allySurvMap.get(hovered);
       var enemySurv = enemySurvMap.get(hovered);
 
-      var inDrawBand = state.drawBand > 0 && Math.abs(hovered) <= state.drawBand;
-
-      // Dentro la fascia di pareggio mostro i dati del pareggio aggregato.
-      if (inDrawBand && drawBin) {
-        smoothProbability = drawBin.probability;
-        allyLoss = drawBin.avgAllyLosses;
-        enemyLoss = drawBin.avgEnemyLosses;
-        allySurv = drawBin.avgAllySurvivors;
-        enemySurv = drawBin.avgEnemySurvivors;
-      }
-
       var html =
         '<div style="font-weight:700;margin-bottom:6px">Vantaggio ' + hovered + '</div>';
 
       html +=
         '<div class="row"><span>Probabilità</span><b>' +
         formatProbability(smoothProbability) + '</b></div>';
-
-      if (inDrawBand) {
-        html +=
-          '<div class="row"><span>Esito</span><b style="color:var(--accent)">' +
-          'Pareggio (entro ±' + state.drawBand + ')</b></div>';
-      }
 
       if (
         allyLoss != null &&
