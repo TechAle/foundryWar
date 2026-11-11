@@ -25,7 +25,6 @@ export const DEFAULT_ALPHA = 0.15;
 export const DEFAULT_BATTLE_SIGMA = 0.05;
 export const DEFAULT_TOTAL_THRESHOLD = 0.8;
 export const DEFAULT_FORCE_COMPRESSION = 0.2;
-export const DEFAULT_DRAW_BAND = 2;
 export const DEFAULT_DICE = 3;
 export const DEFAULT_LOSS_CAP = 0.5;
 export const DEFAULT_DECISIVE_THRESHOLD = 0.95;
@@ -224,9 +223,24 @@ function realSide(simSide, original) {
   };
 }
 
-function compressCount(count, exponent) {
-  if (count <= 0) return 0;
-  return Math.max(1, Math.round(Math.pow(count, exponent)));
+/**
+ * Compressione del rapporto tra le forze.
+ *
+ * Non tocca il lato più piccolo e avvicina il lato più grande a quello piccolo:
+ * con forze uguali non cambia nulla (la curva resta piena), mentre un 2:1
+ * diventa, ad esempio, 1.8:1. Più compressione = più truppe servono per
+ * ottenere lo stesso vantaggio.
+ */
+function compressCounts(allies, enemies, compression) {
+  if (allies <= 0 || enemies <= 0 || compression <= 0) return [allies, enemies];
+  if (allies === enemies) return [allies, enemies];
+
+  const min = Math.min(allies, enemies);
+  const max = Math.max(allies, enemies);
+  const exponent = 1 - compression * 0.8;
+  const newMax = min * Math.pow(max / min, exponent);
+
+  return allies >= enemies ? [newMax, min] : [min, newMax];
 }
 
 /**
@@ -268,10 +282,11 @@ export function simulateBattle(config, rng) {
     0,
     1,
   );
-  const exponent = 1 - compression * 0.8;
-
-  const combatAllies = compressCount(realAllies.initial, exponent);
-  const combatEnemies = compressCount(realEnemies.initial, exponent);
+  const [combatAllies, combatEnemies] = compressCounts(
+    realAllies.initial,
+    realEnemies.initial,
+    compression,
+  );
 
   const scale = Math.max(
     1,
@@ -341,20 +356,7 @@ export function simulateBattle(config, rng) {
   const alliesResult = realSide(allies, realAllies);
   const enemiesResult = realSide(enemies, realEnemies);
 
-  let margin = alliesResult.survivors - enemiesResult.survivors;
-
-  // Pareggio: se entrambi sopravvivono e il margine è entro la soglia,
-  // la battaglia è un pareggio (non un vincitore con 1-2 truppe di vantaggio).
-  const drawBand = Math.max(0, Math.floor(Number(config.drawBand ?? DEFAULT_DRAW_BAND)));
-  if (
-    drawBand > 0 &&
-    alliesResult.survivors > 0 &&
-    enemiesResult.survivors > 0 &&
-    Math.abs(margin) <= drawBand
-  ) {
-    winner = "draw";
-    margin = 0;
-  }
+  const margin = alliesResult.survivors - enemiesResult.survivors;
 
   return {
     winner,

@@ -19,12 +19,12 @@ Non richiede Foundry né dipendenze npm.
   - `0` → deterministico
   - `0.15` → default
   - `1` → molto casuale
-- `forceCompression` ("compressione") riduce l'impatto del vantaggio numerico:
-  le truppe effettive usate nella simulazione sono `truppe^(1 - compressione × 0.8)`.
-  Più è alta, più truppe servono per ottenere lo stesso vantaggio.
+- `forceCompression` ("compressione") comprime il **rapporto** tra le forze:
+  il lato più piccolo resta com'è, il più grande viene avvicinato.
+  `ratio' = ratio^(1 - compressione × 0.8)`. Con forze uguali non cambia nulla,
+  quindi 10 vs 10 resta una curva piena anche con compressione alta.
   - `0` → nessuna compressione
   - `0.2` → default
-  - `0.5` → un 10:1 si comporta circa come un 5:1 (85/15)
   - `1` → compressione massima
 - `battleSigma` ("swing") è l'imprevisto **di battaglia**: un fattore di
   fortuna/morale fisso per tutto lo scontro. Rende meno automatico il vantaggio
@@ -39,11 +39,6 @@ Non richiede Foundry né dipendenze npm.
   battaglia può finire senza distruggere un lato. Il primo lato che raggiunge
   il limite si ritira.
 - `rush = true` rimuove il limite: si continua fino allo sterminio.
-- **Pareggio**: se il margine finale è entro `drawBand` (default 2 truppe
-  effettive) e nessuno dei due è stato azzerato, l'esito è un pareggio. Con
-  forze identiche succede circa il 14% delle volte. `0` disattiva i pareggi.
-  Un pareggio **non è senza perdite**: è una battaglia con perdite simili da
-  entrambi i lati (nel caso 40 vs 40, ~19 per parte contro 15 di media).
 - **Vittoria totale**: il margine del vincitore è ≥ `totalThreshold`
   (default 80%) delle truppe iniziali **del vincitore**. In pratica il vincitore
   conserva quasi tutto il suo esercito e travolge il perdente. Non è un
@@ -83,7 +78,6 @@ Opzioni:
 | `--alpha` | `0.15` | caos per confronto (0–1) |
 | `--battleSigma` | `0.05` | swing/imprevisto di battaglia (0–2) |
 | `--compression` | `0.2` | compressione forze: più alta = più truppe per un vantaggio (0–1) |
-| `--drawBand` | `2` | margine entro cui la battaglia è un pareggio (0 = mai) |
 | `--rush` | `false` | perdite illimitate iniziali |
 | `--lossCap` | `0.5` | limite perdite senza rush |
 | `--totalThreshold` | `0.8` | vittoria totale: margine / truppe iniziali del vincitore |
@@ -101,7 +95,6 @@ In `sim/out/report.html` (passa o clicca sul **?** accanto a ogni voce per la sp
 - **slider** per lo swing (imprevisto di battaglia)
 - **slider** per la soglia di vittoria totale
 - **slider** per la compressione delle forze
-- **slider** per la soglia di pareggio
 - **checkbox** Rush
 - pulsante **Tira 0–100**: estrae un esito dalla curva (pesato sulle
   probabilità) e disegna la linea verticale dove è uscito
@@ -126,7 +119,7 @@ Sul grafico:
   nemici) o bianco (esito normale)
 
 Hover: probabilità, perdite medie e truppe medie **per quel preciso margine**
-(media kernel pesata sulla probabilità dei bin vicini, non il bin più vicino).
+(media kernel pesata sulla probabilità dei bin vicini, calcolata sul margine esatto).
 Sotto il grafico, il pannello del tiro mostra esito, perdite stimate e se è
 stata vittoria totale.
 
