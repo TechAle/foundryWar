@@ -456,7 +456,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
 <body>
   <h1>Foundry War <span>— Simulazione</span></h1>
   <p class="sub">
-    Muovi gli slider: la curva viene ricalcolata in tempo reale con
+    Modifica roster e parametri: la curva viene ricalcolata in tempo reale con
     ${settings.runs.toLocaleString("it-IT")} battaglie per punto.
     alpha ${settings.alpha} · swing ${settings.battleSigma} ·
     compressione ${settings.compression} · rush ${settings.rush ? "ON" : "OFF"} ·
@@ -615,6 +615,9 @@ function buildReportHtml({ engineSource, initial, settings }) {
       <span class="help" tabindex="0" data-help="Le perdite totali vengono distribuite tra le unità: i CR bassi assorbono più danni, ma non tutti. La tabella mostra i valori medi (o quelli del tiro, se hai tirato).">?</span>
     </h3>
     <div class="breakdown-grid" id="breakdown"></div>
+    <p class="note" style="margin-top:10px">
+      Perdite in truppe intere; il totale in truppe effettive è nella card Perdite medie.
+    </p>
   </div>
 
 <div class="help-tip" id="helpTip"></div>
@@ -827,7 +830,7 @@ function buildReportHtml({ engineSource, initial, settings }) {
 
   var NS = "http://www.w3.org/2000/svg";
   var W = 1120, H = 520;
-  var M = { top: 26, right: 76, bottom: 58, left: 70 };
+  var M = { top: 26, right: 120, bottom: 58, left: 70 };
 
   function el(name, attrs) {
     var node = document.createElementNS(NS, name);
