@@ -115,7 +115,8 @@
         "buffSelf": "Buff se stesso (+CR)",
         "debuffEnemies": "Debuff nemici (-CR)",
         "lucky": "Lucky (1dN)",
-        "evasive": "Evasive"
+        "evasive": "Evasive",
+        "swarm": "Swarm (CR ridotto con HP bassi)"
       }
     },
     "battle": {

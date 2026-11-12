@@ -314,6 +314,23 @@ function formatCR(cr) {
   return String(Number(cr.toFixed(2)));
 }
 
+/**
+ * Moltiplicatore del CR base per l'abilità Swarm.
+ * - HP <= metà massima (arrotondata per difetto): CR × 1/2
+ * - HP <= un quarto massimo (arrotondato per difetto): CR × 1/4
+ */
+export function swarmCRMultiplier(hp) {
+  if (hp?.value == null || hp?.max == null) return 1;
+
+  const value = Number(hp.value);
+  const max = Number(hp.max);
+  if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) return 1;
+
+  if (value <= Math.floor(max / 4)) return 0.25;
+  if (value <= Math.floor(max / 2)) return 0.5;
+  return 1;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Composizione delle righe del pannello                                      */
 /* -------------------------------------------------------------------------- */
@@ -373,9 +390,15 @@ async function resolveEntries(state = getWarState()) {
     const stanceBonus = STANCE_CR[state.stances[entry.team]] ?? 0;
     bonus += stanceBonus;
 
+    const swarm = entry.abilities.find(
+      (ability) => ability.enabled && ability.type === "swarm",
+    );
+    const swarmMultiplier = swarm ? swarmCRMultiplier(entry.hp) : 1;
+
     entry.stanceBonus = stanceBonus;
     entry.bonus = bonus;
-    entry.effectiveCR = entry.cr + bonus;
+    entry.swarmMultiplier = swarmMultiplier;
+    entry.effectiveCR = entry.cr * swarmMultiplier + bonus;
     entry.xp = xpForCR(entry.effectiveCR);
 
     let vulnerability = 1;
@@ -430,6 +453,9 @@ function renderAbilityButtons(entry, escapeHTML) {
       suffix = ` (-${value} CR)`;
     } else if (ability.type === "lucky") {
       suffix = ` (1d${value || 6})`;
+    } else if (ability.type === "swarm") {
+      const multiplier = Number(entry.swarmMultiplier) || 1;
+      suffix = multiplier < 1 ? ` (CR ×${multiplier === 0.25 ? "¼" : "½"})` : "";
     }
 
     return `
@@ -446,10 +472,10 @@ function renderAbilityButtons(entry, escapeHTML) {
 }
 
 function renderCard(entry, escapeHTML) {
-  const bonus =
-    entry.bonus > 0
-      ? ` <span class="fw-bonus">→ ${formatCR(entry.effectiveCR)}</span>`
-      : "";
+  const changed = Math.abs(entry.effectiveCR - entry.cr) > 0.0001;
+  const bonus = changed
+    ? ` <span class="fw-bonus${entry.effectiveCR < entry.cr ? " negative" : ""}">→ ${formatCR(entry.effectiveCR)}</span>`
+    : "";
 
   return `
     <article class="fw-card" data-entry-id="${entry.id}">

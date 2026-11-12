@@ -88,15 +88,18 @@ localizzazione e release automatica su GitHub.
   - **Debuff nemici**: -CR a tutti i nemici
   - **Lucky**: 1dN di riduzione del danno
   - **Evasive**: metà probabile di perdere HP
+  - **Swarm**: se gli HP scendono a metà del massimo (arrotondata per difetto)
+    il CR base si dimezza; a un quarto (arrotondato per difetto) diventa 1/4
+    (es. CR 2 → 1 → 0,5)
 - I token salvano solo il **nome del gruppo**: modificando il gruppo cambiano
   tutte le unità che lo usano.
 - Squadra e gruppo sono salvati sull'**attore base**: anche i token creati
   trascinando l'attore dalla sidebar sulla scena ereditano la configurazione.
 - Nel pannello guerra le abilità del gruppo compaiono come checkbox; Taunt,
   Evasive e i buff sono attivi di default. Resistant è passiva.
-- I buff/debuff modificano il CR effettivo e quindi il grafico. Taunt, Evasive,
-  Resistant e Lucky modificano la distribuzione delle perdite per unità
-  (tabella e Applica).
+- I buff/debuff e **Swarm** modificano il CR effettivo e quindi il grafico.
+  Taunt, Evasive, Resistant e Lucky modificano la distribuzione delle perdite
+  per unità (tabella e Applica).
 
 - **Flank / Accerchia** (uno per schieramento): bonus globale di +1 CR / +2 CR
   a tutte le unità di quel lato. Sono mutuamente esclusivi e si disattivano

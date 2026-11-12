@@ -236,6 +236,10 @@
   font-weight: 700;
 }
 
+.fw-bonus.negative {
+  color: #fb7185;
+}
+
 .fw-cr-control {
   display: inline-flex;
   align-items: center;

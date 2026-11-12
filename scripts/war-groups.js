@@ -16,6 +16,7 @@ export const ABILITY_TYPES = [
   { id: "debuffEnemies", labelKey: "FOUNDRY-WAR.groups.type.debuffEnemies" },
   { id: "lucky", labelKey: "FOUNDRY-WAR.groups.type.lucky" },
   { id: "evasive", labelKey: "FOUNDRY-WAR.groups.type.evasive" },
+  { id: "swarm", labelKey: "FOUNDRY-WAR.groups.type.swarm" },
 ];
 
 export function getGroups() {
