@@ -160,6 +160,7 @@
     "warnings": {
       "noActor": "Select a token or open an actor sheet first.",
       "noPermission": "You do not have permission to configure this actor.",
+      "tokenOnly": "Configuration saved only on this token: you cannot modify the base actor, so new tokens may not inherit it.",
       "splitImpossible": "At least 2 HP are required to split the token."
     },
     "notifications": {

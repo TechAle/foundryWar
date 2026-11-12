@@ -90,6 +90,8 @@ localizzazione e release automatica su GitHub.
   - **Evasive**: metà probabile di perdere HP
 - I token salvano solo il **nome del gruppo**: modificando il gruppo cambiano
   tutte le unità che lo usano.
+- Squadra e gruppo sono salvati sull'**attore base**: anche i token creati
+  trascinando l'attore dalla sidebar sulla scena ereditano la configurazione.
 - Nel pannello guerra le abilità del gruppo compaiono come checkbox; Taunt,
   Evasive e i buff sono attivi di default. Resistant è passiva.
 - I buff/debuff modificano il CR effettivo e quindi il grafico. Taunt, Evasive,

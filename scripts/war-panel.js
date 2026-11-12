@@ -105,6 +105,38 @@ function createEntry(token) {
   };
 }
 
+/**
+ * Migra la configurazione dei token non linkati creati prima del fix: se il
+ * token ha una configurazione ma l'attore base no, la copia sull'attore base.
+ */
+async function syncWarFlagToBase(token) {
+  const actor = token?.actor;
+  if (!actor?.isToken) return;
+
+  const baseActor =
+    actor.token?.baseActor ??
+    (actor.token?.actorId ? game.actors?.get(actor.token.actorId) : null);
+
+  if (!baseActor || baseActor === actor) return;
+
+  const data = actor.getFlag(MODULE_ID, "war");
+  if (!data || baseActor.getFlag(MODULE_ID, "war")) return;
+
+  try {
+    await baseActor.setFlag(MODULE_ID, "war", data);
+  } catch {
+    // Il client non può modificare l'attore base: ignora.
+    return;
+  }
+
+  // Rimuove l'override locale: d'ora in poi il token segue l'attore base.
+  try {
+    await actor.token?.delta?.unsetFlag(MODULE_ID, "war");
+  } catch {
+    // Nessun problema: il token conserva comunque i valori migrati.
+  }
+}
+
 /** Aggiunge o rimuove i token indicati dal pannello. */
 export async function toggleTokensInWar(tokens) {
   const list = (tokens ?? []).filter((token) => token?.document?.uuid);
@@ -120,8 +152,12 @@ export async function toggleTokensInWar(tokens) {
 
   for (const token of list) {
     const id = token.document.uuid;
-    if (allPresent) delete next.entries[id];
-    else if (!next.entries[id]) next.entries[id] = createEntry(token);
+    if (allPresent) {
+      delete next.entries[id];
+    } else if (!next.entries[id]) {
+      next.entries[id] = createEntry(token);
+      await syncWarFlagToBase(token);
+    }
   }
 
   await commitWarState(next);

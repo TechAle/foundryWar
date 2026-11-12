@@ -22,6 +22,38 @@ const TEAMS = ["ally", "enemy"];
 /* Dati                                                                       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Per i token non linkati `actor` è un attore sintetico: la configurazione va
+ * salvata sull'attore base, altrimenti i nuovi token creati trascinando
+ * l'attore sulla scena non la ereditano.
+ */
+function getBaseActor(actor) {
+  if (!actor?.isToken) return actor;
+
+  const tokenDoc = actor.token;
+  return (
+    tokenDoc?.baseActor ??
+    (tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId) : null) ??
+    actor
+  );
+}
+
+/**
+ * Rimuove l'override locale del token, così continua a seguire l'attore base.
+ * Restituisce false se l'override non è stato rimosso.
+ */
+async function clearTokenWarOverride(actor) {
+  const delta = actor?.token?.delta;
+  if (!delta || delta.flags?.[MODULE_ID]?.[FLAG_KEY] === undefined) return true;
+
+  try {
+    await delta.unsetFlag(MODULE_ID, FLAG_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Legge la configurazione War di un attore, con valori di default. */
 export function getWarData(actor) {
   const data = actor?.getFlag(MODULE_ID, FLAG_KEY) ?? {};
@@ -41,7 +73,11 @@ export function getWarData(actor) {
 export async function setWarData(actor, { team, troopType, group }) {
   if (!actor) throw new Error(`${MODULE_ID}: attore mancante`);
 
-  const previous = getWarData(actor);
+  const baseActor = getBaseActor(actor);
+  const baseWar = baseActor && baseActor !== actor
+    ? baseActor.getFlag(MODULE_ID, FLAG_KEY)
+    : null;
+  const previous = getWarData(baseWar ? baseActor : actor);
   const nextGroup = getGroup(group);
   const abilities = {};
 
@@ -63,7 +99,29 @@ export async function setWarData(actor, { team, troopType, group }) {
     abilities,
   };
 
-  await actor.setFlag(MODULE_ID, FLAG_KEY, data);
+  let savedOnBase = false;
+  if (baseActor && baseActor !== actor) {
+    try {
+      await baseActor.setFlag(MODULE_ID, FLAG_KEY, data);
+      savedOnBase = true;
+    } catch (error) {
+      console.warn(`${MODULE_ID} | impossibile salvare la configurazione sull'attore base`, error);
+    }
+  }
+
+  if (baseActor && baseActor !== actor && savedOnBase) {
+    // Se il token aveva un override locale (salvataggi precedenti), lo
+    // rimuoviamo: così tutti i token dello stesso attore restano allineati.
+    const cleared = await clearTokenWarOverride(actor);
+    if (!cleared) await actor.setFlag(MODULE_ID, FLAG_KEY, data);
+  } else {
+    await actor.setFlag(MODULE_ID, FLAG_KEY, data);
+  }
+
+  if (baseActor && baseActor !== actor && !savedOnBase) {
+    ui.notifications.warn(game.i18n.localize("FOUNDRY-WAR.warnings.tokenOnly"));
+  }
+
   return data;
 }
 
@@ -83,7 +141,15 @@ export async function openWarConfig(actor) {
     return;
   }
 
-  const current = getWarData(actor);
+  // Se l'attore base ha già una configurazione, mostriamo quella: è il valore
+  // che verrà ereditato dai nuovi token creati dalla sidebar.
+  const baseActor = getBaseActor(actor);
+  const baseWar = baseActor && baseActor !== actor
+    ? baseActor.getFlag(MODULE_ID, FLAG_KEY)
+    : null;
+  const configActor = baseWar ? baseActor : actor;
+
+  const current = getWarData(configActor);
   const groups = Object.keys(getGroups()).sort((a, b) => a.localeCompare(b));
 
   if (current.group && !groups.includes(current.group)) {

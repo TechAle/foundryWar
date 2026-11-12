@@ -160,6 +160,7 @@
     "warnings": {
       "noActor": "Seleziona un token o apri la scheda di un attore.",
       "noPermission": "Non hai i permessi per configurare questo attore.",
+      "tokenOnly": "Configurazione salvata solo su questo token: non hai i permessi per modificare l'attore base, quindi i nuovi token potrebbero non ereditarla.",
       "splitImpossible": "Servono almeno 2 HP per dividere il token."
     },
     "notifications": {

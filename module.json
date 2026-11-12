@@ -2,7 +2,7 @@
   "id": "foundry-war",
   "title": "Foundry War",
   "description": "Pannello di guerra condiviso ed economia del forte per Foundry VTT v13.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "library": false,
   "socket": true,
   "compatibility": {
