@@ -88,9 +88,9 @@ localizzazione e release automatica su GitHub.
   - **Debuff nemici**: -CR a tutti i nemici
   - **Lucky**: 1dN di riduzione del danno
   - **Evasive**: metà probabile di perdere HP
-  - **Swarm**: se gli HP scendono a metà del massimo (arrotondata per difetto)
-    il CR base si dimezza; a un quarto (arrotondato per difetto) diventa 1/4
-    (es. CR 2 → 1 → 0,5)
+  - **Swarm**: il CR base scende a 3/4 quando gli HP arrivano a 3/4 del
+    massimo (arrotondato per difetto), a 1/2 a metà e a 1/4 a un quarto
+    (es. CR 4 → 3 → 2 → 1; CR 2 → 1,5 → 1 → 0,5)
 - I token salvano solo il **nome del gruppo**: modificando il gruppo cambiano
   tutte le unità che lo usano.
 - Squadra e gruppo sono salvati sull'**attore base**: anche i token creati

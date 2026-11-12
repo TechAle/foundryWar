@@ -310,14 +310,16 @@ function formatCR(cr) {
   if (cr === 0.125) return "1/8";
   if (cr === 0.25) return "1/4";
   if (cr === 0.5) return "1/2";
+  if (cr === 0.75) return "3/4";
   if (Number.isInteger(cr)) return String(cr);
   return String(Number(cr.toFixed(2)));
 }
 
 /**
  * Moltiplicatore del CR base per l'abilità Swarm.
- * - HP <= metà massima (arrotondata per difetto): CR × 1/2
- * - HP <= un quarto massimo (arrotondato per difetto): CR × 1/4
+ * - HP <= 3/4 del massimo (arrotondato per difetto): CR × 3/4
+ * - HP <= 1/2 del massimo (arrotondato per difetto): CR × 1/2
+ * - HP <= 1/4 del massimo (arrotondato per difetto): CR × 1/4
  */
 export function swarmCRMultiplier(hp) {
   if (hp?.value == null || hp?.max == null) return 1;
@@ -328,6 +330,7 @@ export function swarmCRMultiplier(hp) {
 
   if (value <= Math.floor(max / 4)) return 0.25;
   if (value <= Math.floor(max / 2)) return 0.5;
+  if (value <= Math.floor((max * 3) / 4)) return 0.75;
   return 1;
 }
 
@@ -455,7 +458,9 @@ function renderAbilityButtons(entry, escapeHTML) {
       suffix = ` (1d${value || 6})`;
     } else if (ability.type === "swarm") {
       const multiplier = Number(entry.swarmMultiplier) || 1;
-      suffix = multiplier < 1 ? ` (CR ×${multiplier === 0.25 ? "¼" : "½"})` : "";
+      const fraction =
+        multiplier === 0.25 ? "¼" : multiplier === 0.5 ? "½" : multiplier === 0.75 ? "¾" : "";
+      suffix = fraction ? ` (CR ×${fraction})` : "";
     }
 
     return `
