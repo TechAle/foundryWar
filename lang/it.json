@@ -116,7 +116,8 @@
         "debuffEnemies": "Debuff nemici (-CR)",
         "lucky": "Lucky (1dN)",
         "evasive": "Evasive",
-        "swarm": "Swarm (CR ridotto con HP bassi)"
+        "swarm": "Swarm (CR ridotto con HP bassi)",
+        "fragile": "Fragile (perdite ×2)"
       }
     },
     "battle": {

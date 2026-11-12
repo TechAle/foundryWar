@@ -145,7 +145,7 @@ export function effectiveTroops(battalions, bonus = 0) {
  * sempre identico. Le perdite non superano mai le truppe effettive dell'unità
  * e l'eventuale eccedenza viene ridistribuita sulle altre.
  *
- * @param {Array<{name?:string,cr:number,troops:number}>} units
+ * @param {Array<{name?:string,cr:number,troops:number,fragile?:boolean}>} units
  * @param {number} totalLoss perdite totali in truppe effettive
  * @param {{bias?:number,randomness?:number,seed?:number}} [options]
  */
@@ -168,6 +168,7 @@ export function distributeLosses(units, totalLoss, options = {}) {
       effective,
       vulnerability: Math.max(0, Number(unit.vulnerability ?? 1)),
       luckyDie: Math.max(0, Math.floor(Number(unit.luckyDie ?? 0))),
+      fragile: Boolean(unit.fragile),
       losses: 0,
     };
   });
@@ -251,10 +252,18 @@ export function distributeLosses(units, totalLoss, options = {}) {
   }
 
   return rows.map((row) => {
-    const losses = Math.min(row.effective, Math.round(row.losses));
+    const rawLosses = Math.min(row.effective, Math.round(row.losses));
+    let troopLosses =
+      row.perTroop > 0 ? Math.min(row.troops, Math.round(rawLosses / row.perTroop)) : 0;
+
+    // Fragile: ogni perdita di truppa conta il doppio.
+    if (row.fragile) troopLosses = Math.min(row.troops, troopLosses * 2);
+
+    const losses = Math.min(
+      row.effective,
+      Math.round(troopLosses * row.perTroop),
+    );
     const survivors = row.effective - losses;
-    const troopLosses =
-      row.perTroop > 0 ? Math.min(row.troops, Math.round(losses / row.perTroop)) : 0;
 
     return {
       name: row.name,
@@ -262,6 +271,7 @@ export function distributeLosses(units, totalLoss, options = {}) {
       troops: row.troops,
       perTroop: row.perTroop,
       effective: row.effective,
+      fragile: row.fragile,
       losses,
       survivors,
       troopLosses,

@@ -17,6 +17,7 @@ export const ABILITY_TYPES = [
   { id: "lucky", labelKey: "FOUNDRY-WAR.groups.type.lucky" },
   { id: "evasive", labelKey: "FOUNDRY-WAR.groups.type.evasive" },
   { id: "swarm", labelKey: "FOUNDRY-WAR.groups.type.swarm" },
+  { id: "fragile", labelKey: "FOUNDRY-WAR.groups.type.fragile" },
 ];
 
 export function getGroups() {

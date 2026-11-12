@@ -91,6 +91,7 @@ localizzazione e release automatica su GitHub.
   - **Swarm**: il CR totale (base + buff/debuff + stance) scende a 3/4 quando
     gli HP arrivano a 3/4 del massimo (arrotondato per difetto), a 1/2 a metà e
     a 1/4 a un quarto (es. CR 4 → 3 → 2 → 1; CR 2 → 1,5 → 1 → 0,5)
+  - **Fragile**: le perdite di truppe contano il doppio (2 truppe perse → 4)
 - I token salvano solo il **nome del gruppo**: modificando il gruppo cambiano
   tutte le unità che lo usano.
 - Squadra e gruppo sono salvati sull'**attore base**: anche i token creati
@@ -98,8 +99,9 @@ localizzazione e release automatica su GitHub.
 - Nel pannello guerra le abilità del gruppo compaiono come checkbox; Taunt,
   Evasive e i buff sono attivi di default. Resistant è passiva.
 - I buff/debuff e **Swarm** modificano il CR effettivo e quindi il grafico.
-  Taunt, Evasive, Resistant e Lucky modificano la distribuzione delle perdite
-  per unità (tabella e Applica).
+  Taunt, Evasive e Resistant modificano la distribuzione delle perdite per
+  unità, Lucky la riduce e **Fragile** raddoppia le perdite di truppe subite
+  (tabella e Applica).
 
 - **Flank / Accerchia** (uno per schieramento): bonus globale di +1 CR / +2 CR
   a tutte le unità di quel lato. Sono mutuamente esclusivi e si disattivano

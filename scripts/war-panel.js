@@ -416,6 +416,9 @@ async function resolveEntries(state = getWarState()) {
       vulnerability *= 0.5;
     }
     entry.vulnerability = vulnerability;
+    entry.fragile = entry.abilities.some(
+      (ability) => ability.enabled && ability.type === "fragile",
+    );
 
     const lucky = entry.abilities.find(
       (ability) => ability.enabled && ability.type === "lucky",
@@ -462,6 +465,8 @@ function renderAbilityButtons(entry, escapeHTML) {
       const fraction =
         multiplier === 0.25 ? "¼" : multiplier === 0.5 ? "½" : multiplier === 0.75 ? "¾" : "";
       suffix = fraction ? ` (CR ×${fraction})` : "";
+    } else if (ability.type === "fragile") {
+      suffix = " (perdite ×2)";
     }
 
     return `
@@ -582,6 +587,7 @@ function buildBattle(entries, state) {
       actor: entry.actor,
       vulnerability: entry.vulnerability ?? 1,
       luckyDie: entry.luckyDie ?? 0,
+      fragile: Boolean(entry.fragile),
     });
   }
 
