@@ -401,7 +401,8 @@ async function resolveEntries(state = getWarState()) {
     entry.stanceBonus = stanceBonus;
     entry.bonus = bonus;
     entry.swarmMultiplier = swarmMultiplier;
-    entry.effectiveCR = entry.cr * swarmMultiplier + bonus;
+    // Swarm riduce il CR totale (base + buff/debuff + stance), non solo la base.
+    entry.effectiveCR = (entry.cr + bonus) * swarmMultiplier;
     entry.xp = xpForCR(entry.effectiveCR);
 
     let vulnerability = 1;
