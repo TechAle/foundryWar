@@ -15,6 +15,7 @@ import {
 import {
   commitWarState,
   getWarState,
+  migrateWarFlagsToBase,
   refreshWarPanel,
   toggleTokensInWar,
   toggleWarPanel,
@@ -138,6 +139,8 @@ Hooks.once("ready", () => {
   });
 
   if (!game.settings.get(MODULE_ID, "enabled")) return;
+
+  migrateWarFlagsToBase();
 
   ui.notifications.info(game.i18n.localize("FOUNDRY-WAR.notifications.ready"));
 });

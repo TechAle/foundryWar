@@ -137,6 +137,42 @@ async function syncWarFlagToBase(token) {
   }
 }
 
+/**
+ * Migrazione per i mondi esistenti: copia sull'attore base la configurazione
+ * rimasta solo nel delta dei token non linkati e rimuove l'override locale.
+ */
+export async function migrateWarFlagsToBase() {
+  if (!game.user?.isGM) return;
+
+  for (const scene of game.scenes ?? []) {
+    for (const tokenDoc of scene.tokens ?? []) {
+      const delta = tokenDoc.delta;
+      const data = delta?.getFlag?.(MODULE_ID, "war");
+      if (!data) continue;
+
+      const baseActor =
+        tokenDoc.baseActor ??
+        (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null);
+      if (!baseActor) continue;
+
+      if (!baseActor.getFlag(MODULE_ID, "war")) {
+        try {
+          await baseActor.setFlag(MODULE_ID, "war", data);
+        } catch {
+          // Senza permessi non tocchiamo il delta: il token resta com'è.
+          continue;
+        }
+      }
+
+      try {
+        await delta.unsetFlag(MODULE_ID, "war");
+      } catch {
+        // Il token conserva comunque i valori migrati.
+      }
+    }
+  }
+}
+
 /** Aggiunge o rimuove i token indicati dal pannello. */
 export async function toggleTokensInWar(tokens) {
   const list = (tokens ?? []).filter((token) => token?.document?.uuid);
