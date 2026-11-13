@@ -1,9 +1,31 @@
 # Foundry War
 
-Modulo di esempio per **Foundry VTT v13 (verificato su 13.351)**.
+Modulo per **Foundry VTT v13** che aggiunge un pannello di guerra condiviso,
+classi e abilità personalizzabili, simulazione delle battaglie e un sistema
+economico completo per il forte.
 
-Serve come base minima e funzionante: manifest, codice ES module, stili,
-localizzazione e release automatica su GitHub.
+Lo stato è sincronizzato in tempo reale tra tutti i client, log compresi.
+
+**Installazione rapida** — Incolla questo URL in Foundry VTT →
+Add-on Modules → Install Module:
+
+```
+https://github.com/TechAle/foundryWar/releases/latest/download/module.json
+```
+
+Richiede Foundry VTT **v13** (verificato su 13.351).
+
+## Funzionalità principali
+
+- **Pannello di guerra condiviso**: alleati/nemici, CR, HP, gruppo e abilità.
+- **Classi e abilità personalizzabili**: Taunt, Resistant, Buff/Debuff, Lucky,
+  Evasive, Swarm e Fragile.
+- **Simulazione battaglie**: grafico degli esiti, tiro 0–100, distribuzione e
+  applicazione delle perdite.
+- **Economia del forte**: risorse, lavoratori, esercito, fortificazioni,
+  macchine d'assalto, commercio, spedizioni e battaglie.
+- **Sincronizzazione**: world setting + socket, log inclusi.
+- **Split token** e gestione rapida dal Token HUD.
 
 ## Cosa fa
 
