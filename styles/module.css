@@ -94,6 +94,29 @@
   background: rgba(0, 0, 0, 0.3);
 }
 
+.fw-clear {
+  padding: 0.05rem 0.4rem;
+  font-size: var(--font-size-12, 0.75rem);
+  line-height: 1.3;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.fw-clear:hover:not(:disabled) {
+  opacity: 1;
+  color: #ff8a8a;
+  border-color: #ff8a8a;
+}
+
+.fw-clear:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
 .fw-stances {
   display: flex;
   flex-wrap: wrap;

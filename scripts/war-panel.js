@@ -556,6 +556,11 @@ function renderColumn(team, entries, stance, escapeHTML) {
         <i class="fa-solid ${team === "ally" ? "fa-shield-halved" : "fa-skull"}"></i>
         ${label}
         <span class="fw-count">${entries.length}</span>
+        <button type="button" class="fw-clear" data-action="clearTeam" data-team="${team}"
+                data-tooltip="${game.i18n.localize(team === "ally" ? "FOUNDRY-WAR.panel.clearAllies" : "FOUNDRY-WAR.panel.clearEnemies")}"
+                ${entries.length ? "" : "disabled"}>
+          ${game.i18n.localize("FOUNDRY-WAR.panel.clear")}
+        </button>
       </h2>
       <div class="fw-stances">${stanceButtons}</div>
       <div class="fw-list">${cards}</div>
@@ -966,6 +971,7 @@ export class WarPanel extends ApplicationV2 {
       rollBattle: WarPanel.onRollBattle,
       applyBattle: WarPanel.onApplyBattle,
       removeEntry: WarPanel.onRemoveEntry,
+      clearTeam: WarPanel.onClearTeam,
       toggleAbility: WarPanel.onToggleAbility,
       adjustCR: WarPanel.onAdjustCR,
       setStance: WarPanel.onSetStance,
@@ -1115,6 +1121,28 @@ export class WarPanel extends ApplicationV2 {
     await commitWarState({
       ...state,
       entries,
+      battle: { ...state.battle, roll: null },
+    });
+  }
+
+  static async onClearTeam(_event, target) {
+    const team = target.dataset.team;
+    if (!["ally", "enemy"].includes(team)) return;
+
+    const state = getWarState();
+    const entries = await resolveEntries(state);
+    const ids = entries
+      .filter((entry) => entry.team === team)
+      .map((entry) => entry.id);
+
+    if (!ids.length) return;
+
+    const nextEntries = { ...state.entries };
+    for (const id of ids) delete nextEntries[id];
+
+    await commitWarState({
+      ...state,
+      entries: nextEntries,
       battle: { ...state.battle, roll: null },
     });
   }
