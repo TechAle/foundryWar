@@ -7,6 +7,8 @@
  * e si risolvono con gli input nel pannello.
  */
 
+import { captureScrollPositions, restoreScrollPositions } from "./ui-scroll.js";
+
 const MODULE_ID = "foundry-war";
 const SETTING = "economyState";
 const LOG_LIMIT = 200;
@@ -1518,8 +1520,12 @@ export function refreshEconomyPanel() {
   if (!economyPanel?.rendered) return;
 
   clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(() => {
+  refreshTimer = setTimeout(async () => {
     refreshTimer = null;
-    if (economyPanel?.rendered) economyPanel.render();
+    if (!economyPanel?.rendered) return;
+
+    const scrollPositions = captureScrollPositions(economyPanel.element);
+    await economyPanel.render();
+    restoreScrollPositions(economyPanel?.element, scrollPositions);
   }, 120);
 }

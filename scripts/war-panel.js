@@ -21,6 +21,7 @@ import {
 } from "./battle-engine.js";
 
 import { getGroup } from "./war-groups.js";
+import { captureScrollPositions, restoreScrollPositions } from "./ui-scroll.js";
 
 const MODULE_ID = "foundry-war";
 const STATE_KEY = "warState";
@@ -1348,9 +1349,13 @@ export function refreshWarPanel() {
   if (!panelInstance?.rendered) return;
 
   clearTimeout(panelRefreshTimer);
-  panelRefreshTimer = setTimeout(() => {
+  panelRefreshTimer = setTimeout(async () => {
     panelRefreshTimer = null;
-    if (panelInstance?.rendered) panelInstance.render();
+    if (!panelInstance?.rendered) return;
+
+    const scrollPositions = captureScrollPositions(panelInstance.element);
+    await panelInstance.render();
+    restoreScrollPositions(panelInstance?.element, scrollPositions);
   }, 150);
 }
 
