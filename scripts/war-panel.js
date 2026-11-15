@@ -511,6 +511,7 @@ function renderCard(entry, escapeHTML) {
   const bonus = changed
     ? ` <span class="fw-bonus${entry.effectiveCR < entry.cr ? " negative" : ""}">→ ${formatCR(entry.effectiveCR)}</span>`
     : "";
+  const hideEffects = entry.team === "enemy" && !game.user.isGM;
 
   return `
     <article class="fw-card" data-entry-id="${entry.id}">
@@ -543,7 +544,7 @@ function renderCard(entry, escapeHTML) {
             ${entry.groupName ? escapeHTML(entry.groupName) : "—"}
           </span>
         </div>
-        ${renderAbilityButtons(entry, escapeHTML)}
+        ${hideEffects ? "" : renderAbilityButtons(entry, escapeHTML)}
       </div>
     </article>
   `;
@@ -1213,6 +1214,8 @@ export class WarPanel extends ApplicationV2 {
     if (!actor) return;
 
     const war = actor.getFlag(MODULE_ID, "war") ?? {};
+    if (war.team === "enemy" && !game.user.isGM) return;
+
     const group = getGroup(war.group);
     const ability = group?.abilities?.find((candidate) => candidate.id === abilityId);
     if (!ability || ability.type === "resistant") return;

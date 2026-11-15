@@ -54,6 +54,8 @@ Richiede Foundry VTT **v13** (verificato su 13.351).
   l'eccesso.
 - Il pannello è diviso in **Alleati** (sinistra) e **Nemici** (destra) e mostra
   per ogni unità token, CR, HP e gruppo (classe).
+- Le **abilità dei nemici** sono visibili e modificabili solo dal GM: i
+  giocatori vedono comunque CR, HP, token e quantità.
 - Il **CR è modificabile a mano** con i pulsanti `−` / `+` su ogni card
   (parte dal CR dell'attore, minimo 0). Il valore manuale resta solo nel
   pannello e non tocca la scheda.
