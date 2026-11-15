@@ -120,7 +120,8 @@
         "lucky": "Lucky (1dN)",
         "evasive": "Evasive",
         "swarm": "Swarm (CR ridotto con HP bassi)",
-        "fragile": "Fragile (perdite ×2)"
+        "fragile": "Fragile (perdite ×2)",
+        "strong": "Strong (aumenta le perdite nemiche)"
       }
     },
     "battle": {

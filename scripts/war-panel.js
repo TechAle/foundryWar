@@ -335,6 +335,24 @@ export function swarmCRMultiplier(hp) {
   return 1;
 }
 
+/**
+ * Strong aumenta le perdite del lato opposto in proporzione alle truppe
+ * dell'attaccante che hanno l'abilità attiva.
+ * Es.: 10 truppe strong su 40 totali → perdite nemiche × 1,25.
+ */
+export function strongLossMultiplier(side) {
+  let total = 0;
+  let strong = 0;
+
+  for (const unit of side ?? []) {
+    const troops = Math.max(0, Number(unit.troops) || 0);
+    total += troops;
+    if (unit.strong) strong += troops;
+  }
+
+  return total > 0 ? 1 + strong / total : 1;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Composizione delle righe del pannello                                      */
 /* -------------------------------------------------------------------------- */
@@ -420,6 +438,9 @@ async function resolveEntries(state = getWarState()) {
     entry.fragile = entry.abilities.some(
       (ability) => ability.enabled && ability.type === "fragile",
     );
+    entry.strong = entry.abilities.some(
+      (ability) => ability.enabled && ability.type === "strong",
+    );
 
     const lucky = entry.abilities.find(
       (ability) => ability.enabled && ability.type === "lucky",
@@ -468,6 +489,8 @@ function renderAbilityButtons(entry, escapeHTML) {
       suffix = fraction ? ` (CR ×${fraction})` : "";
     } else if (ability.type === "fragile") {
       suffix = " (perdite ×2)";
+    } else if (ability.type === "strong") {
+      suffix = " (perdite nemiche +)";
     }
 
     return `
@@ -594,6 +617,7 @@ function buildBattle(entries, state) {
       vulnerability: entry.vulnerability ?? 1,
       luckyDie: entry.luckyDie ?? 0,
       fragile: Boolean(entry.fragile),
+      strong: Boolean(entry.strong),
     });
   }
 
@@ -621,6 +645,10 @@ function buildBattle(entries, state) {
     distribution,
     threshold: settings.threshold,
     signature: battleSignature(entries, state, settings),
+    lossMultipliers: {
+      ally: strongLossMultiplier(sides.enemy),
+      enemy: strongLossMultiplier(sides.ally),
+    },
     roll: null,
   };
 }
@@ -1017,9 +1045,11 @@ export class WarPanel extends ApplicationV2 {
             bin,
             allyRows: distributeLosses(battle.sides.ally, bin.avgAllyLosses, {
               seed: storedRoll.seed,
+              lossMultiplier: battle.lossMultipliers?.ally ?? 1,
             }),
             enemyRows: distributeLosses(battle.sides.enemy, bin.avgEnemyLosses, {
               seed: storedRoll.seed + 1,
+              lossMultiplier: battle.lossMultipliers?.enemy ?? 1,
             }),
           };
         }
@@ -1303,9 +1333,11 @@ export class WarPanel extends ApplicationV2 {
 
     const allyRows = distributeLosses(battle.sides.ally, bin.avgAllyLosses, {
       seed: storedRoll.seed,
+      lossMultiplier: battle.lossMultipliers?.ally ?? 1,
     });
     const enemyRows = distributeLosses(battle.sides.enemy, bin.avgEnemyLosses, {
       seed: storedRoll.seed + 1,
+      lossMultiplier: battle.lossMultipliers?.enemy ?? 1,
     });
 
     const applications = [

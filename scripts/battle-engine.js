@@ -147,11 +147,15 @@ export function effectiveTroops(battalions, bonus = 0) {
  *
  * @param {Array<{name?:string,cr:number,troops:number,fragile?:boolean}>} units
  * @param {number} totalLoss perdite totali in truppe effettive
- * @param {{bias?:number,randomness?:number,seed?:number}} [options]
+ * @param {{bias?:number,randomness?:number,seed?:number,lossMultiplier?:number}} [options]
  */
 export function distributeLosses(units, totalLoss, options = {}) {
   const bias = Math.max(0, Number(options.bias ?? 1));
   const randomness = Math.max(0, Number(options.randomness ?? 0.25));
+  const rawMultiplier = Number(options.lossMultiplier ?? 1);
+  const lossMultiplier = Number.isFinite(rawMultiplier)
+    ? Math.max(0, rawMultiplier)
+    : 1;
   const rng = createRng(Number(options.seed ?? 0x5eed));
 
   const rows = (units ?? []).map((unit) => {
@@ -174,7 +178,10 @@ export function distributeLosses(units, totalLoss, options = {}) {
   });
 
   const totalEffective = rows.reduce((sum, row) => sum + row.effective, 0);
-  let remaining = Math.max(0, Math.min(Number(totalLoss) || 0, totalEffective));
+  let remaining = Math.max(
+    0,
+    Math.min((Number(totalLoss) || 0) * lossMultiplier, totalEffective),
+  );
 
   const weights = rows.map((row) => {
     if (row.effective <= 0) return 0;

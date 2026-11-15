@@ -114,6 +114,8 @@ Richiede Foundry VTT **v13** (verificato su 13.351).
     gli HP arrivano a 3/4 del massimo (arrotondato per difetto), a 1/2 a metà e
     a 1/4 a un quarto (es. CR 4 → 3 → 2 → 1; CR 2 → 1,5 → 1 → 0,5)
   - **Fragile**: le perdite di truppe contano il doppio (2 truppe perse → 4)
+  - **Strong**: aumenta le perdite nemiche in proporzione alle truppe con
+    l'abilità attiva (10 truppe su 40 → +25%; tutte le truppe → raddoppio)
 - I token salvano solo il **nome del gruppo**: modificando il gruppo cambiano
   tutte le unità che lo usano.
 - Squadra e gruppo sono salvati sull'**attore base**: anche i token creati
@@ -122,8 +124,8 @@ Richiede Foundry VTT **v13** (verificato su 13.351).
   Evasive e i buff sono attivi di default. Resistant è passiva.
 - I buff/debuff e **Swarm** modificano il CR effettivo e quindi il grafico.
   Taunt, Evasive e Resistant modificano la distribuzione delle perdite per
-  unità, Lucky la riduce e **Fragile** raddoppia le perdite di truppe subite
-  (tabella e Applica).
+  unità, Lucky la riduce, **Fragile** raddoppia le perdite subite e **Strong**
+  aumenta quelle nemiche in proporzione (tabella e Applica).
 
 - **Flank / Accerchia** (uno per schieramento): bonus globale di +1 CR / +2 CR
   a tutte le unità di quel lato. Sono mutuamente esclusivi e si disattivano
