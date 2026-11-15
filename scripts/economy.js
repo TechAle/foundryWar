@@ -14,6 +14,7 @@ const SETTING = "economyState";
 const LOG_LIMIT = 200;
 
 const DEFAULT_STATE = {
+  revision: 0,
   day: 1,
   popTotal: 200,
   resources: {
@@ -138,6 +139,7 @@ export function normalizeEconomyState(saved) {
   return {
     ...base,
     ...saved,
+    revision: Math.max(0, Math.floor(Number(saved.revision) || 0)),
     day: Math.max(1, Math.floor(Number(saved.day) || 1)),
     popTotal: Math.max(0, Math.floor(Number(saved.popTotal) || 0)),
     resources,
@@ -152,21 +154,74 @@ export function normalizeEconomyState(saved) {
   };
 }
 
-export function getEconomyState() {
+/**
+ * Stato locale ottimistico: i client non-GM vedono subito la modifica mentre
+ * il GM la applica e la ridistribuisce, senza aspettare il round-trip.
+ */
+let optimisticState = null;
+let optimisticTimer = null;
+
+function getStoredState() {
   return normalizeEconomyState(game.settings.get(MODULE_ID, SETTING));
 }
 
-export async function commitEconomyState(next) {
-  const normalized = normalizeEconomyState(next);
+function clearOptimisticState() {
+  optimisticState = null;
+  clearTimeout(optimisticTimer);
+  optimisticTimer = null;
+}
 
-  if (game.user.isGM) {
-    return game.settings.set(MODULE_ID, SETTING, normalized);
+function scheduleOptimisticReset() {
+  clearTimeout(optimisticTimer);
+  optimisticTimer = setTimeout(() => {
+    optimisticTimer = null;
+    if (!optimisticState) return;
+    const stored = getStoredState();
+    if (stored.revision < optimisticState.revision) {
+      clearOptimisticState();
+      refreshEconomyPanel();
+    }
+  }, 8000);
+}
+
+export function getEconomyState() {
+  const stored = getStoredState();
+  if (!optimisticState) return stored;
+
+  if (stored.revision >= optimisticState.revision) {
+    clearOptimisticState();
+    return stored;
   }
 
-  game.socket.emit(`module.${MODULE_ID}`, {
-    type: "setEconomyState",
-    state: normalized,
-  });
+  return normalizeEconomyState(optimisticState);
+}
+
+export async function commitEconomyState(next) {
+  const stored = getStoredState();
+  const normalized = normalizeEconomyState(next);
+  normalized.revision = Math.max(stored.revision, normalized.revision) + 1;
+
+  optimisticState = normalized;
+  scheduleOptimisticReset();
+
+  if (game.user.isGM) {
+    try {
+      return await game.settings.set(MODULE_ID, SETTING, normalized);
+    } catch (error) {
+      clearOptimisticState();
+      throw error;
+    }
+  }
+
+  try {
+    game.socket.emit(`module.${MODULE_ID}`, {
+      type: "setEconomyState",
+      state: normalized,
+    });
+  } catch (error) {
+    clearOptimisticState();
+    throw error;
+  }
   return null;
 }
 
@@ -925,6 +980,7 @@ export class EconomyPanel extends ApplicationV2 {
     }
     if (!result?.state) return;
     await commitEconomyState(result.state);
+    refreshEconomyPanel();
   }
 
   static async onAdvanceDay() {
@@ -1503,7 +1559,58 @@ function renderEconomy(state) {
 /* -------------------------------------------------------------------------- */
 
 let economyPanel = null;
-let refreshTimer = null;
+let refreshScheduled = false;
+
+function captureFormState(root) {
+  if (!root) return null;
+
+  const fields = {};
+  root.querySelectorAll("input[id], select[id], textarea[id]").forEach((element) => {
+    fields[element.id] = element.type === "checkbox" ? element.checked : element.value;
+  });
+
+  const active = document.activeElement;
+  const isInside = active && root.contains(active);
+
+  return {
+    fields,
+    activeId: isInside ? active.id : "",
+    selectionStart: isInside && typeof active.selectionStart === "number"
+      ? active.selectionStart
+      : null,
+    selectionEnd: isInside && typeof active.selectionEnd === "number"
+      ? active.selectionEnd
+      : null,
+  };
+}
+
+function restoreFormState(root, state) {
+  if (!root || !state) return;
+
+  for (const [id, value] of Object.entries(state.fields ?? {})) {
+    const element = root.querySelector(`#${id}`);
+    if (!element) continue;
+
+    if (element.type === "checkbox") element.checked = Boolean(value);
+    else element.value = value;
+
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  if (!state.activeId) return;
+
+  const active = root.querySelector(`#${state.activeId}`);
+  if (!active) return;
+
+  active.focus({ preventScroll: true });
+  if (
+    state.selectionStart != null &&
+    typeof active.setSelectionRange === "function"
+  ) {
+    active.setSelectionRange(state.selectionStart, state.selectionEnd);
+  }
+}
 
 export function toggleEconomyPanel() {
   if (economyPanel?.rendered) {
@@ -1517,15 +1624,19 @@ export function toggleEconomyPanel() {
 }
 
 export function refreshEconomyPanel() {
-  if (!economyPanel?.rendered) return;
+  if (!economyPanel?.rendered || refreshScheduled) return;
+  refreshScheduled = true;
 
-  clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(async () => {
-    refreshTimer = null;
+  setTimeout(async () => {
+    refreshScheduled = false;
     if (!economyPanel?.rendered) return;
 
+    const formState = captureFormState(economyPanel.element);
     const scrollPositions = captureScrollPositions(economyPanel.element);
     await economyPanel.render();
-    restoreScrollPositions(economyPanel?.element, scrollPositions);
-  }, 120);
+
+    const root = economyPanel?.element;
+    restoreFormState(root, formState);
+    restoreScrollPositions(root, scrollPositions);
+  }, 100);
 }

@@ -134,7 +134,14 @@ Hooks.once("ready", () => {
     if (payload?.type === "setWarState") {
       game.settings.set(MODULE_ID, STATE_KEY, payload.state);
     } else if (payload?.type === "setEconomyState") {
-      game.settings.set(MODULE_ID, "economyState", payload.state);
+      const current = game.settings.get(MODULE_ID, "economyState");
+      const incomingRevision = Number(payload.state?.revision ?? 0);
+      const currentRevision = Number(current?.revision ?? 0);
+
+      // Ignora aggiornamenti rimasti indietro rispetto allo stato attuale.
+      if (incomingRevision >= currentRevision) {
+        game.settings.set(MODULE_ID, "economyState", payload.state);
+      }
     }
   });
 
