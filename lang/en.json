@@ -17,6 +17,14 @@
       "split": "Split",
       "splitDone": "Token split: {name}."
     },
+    "move": {
+      "title": "Move tokens with arrows",
+      "direction": "Direction",
+      "distance": "Movement",
+      "none": "No tokens with direction and movement.",
+      "done": "Tokens moved: {count}.",
+      "blocked": "{name} is blocked by a wall."
+    },
     "settings": {
       "enabled": {
         "name": "Enable Foundry War",
