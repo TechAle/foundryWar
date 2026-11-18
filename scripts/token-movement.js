@@ -159,6 +159,7 @@ async function moveToken(token) {
   let endX = origin.x;
   let endY = origin.y;
   let newDir = data.dir;
+  let traveled = total;
 
   if (free(ux * total, uy * total)) {
     endX += ux * total;
@@ -174,22 +175,26 @@ async function moveToken(token) {
     }
 
     const forward = lo;
-    const impactX = origin.x + ux * forward;
-    const impactY = origin.y + uy * forward;
+    const impact = new PIXI.Point(
+      origin.x + ux * forward,
+      origin.y + uy * forward,
+    );
     const remaining = total - forward;
 
-    endX = impactX;
-    endY = impactY;
+    endX = impact.x;
+    endY = impact.y;
     newDir = closestDirection(-ux, -uy);
+    traveled = forward;
 
+    // Il movimento che avanza dopo il muro viene percorso all'indietro.
     if (remaining > 0.5) {
       let back = remaining;
-      if (!freeFrom({ x: impactX, y: impactY }, -ux * back, -uy * back)) {
+      if (!freeFrom(impact, -ux * back, -uy * back)) {
         let loBack = 0;
         let hiBack = back;
         for (let i = 0; i < 14; i += 1) {
           const mid = (loBack + hiBack) / 2;
-          if (freeFrom({ x: impactX, y: impactY }, -ux * mid, -uy * mid)) {
+          if (freeFrom(impact, -ux * mid, -uy * mid)) {
             loBack = mid;
           } else {
             hiBack = mid;
@@ -199,11 +204,11 @@ async function moveToken(token) {
       }
       endX += -ux * back;
       endY += -uy * back;
+      traveled += back;
     }
   }
 
-  const moved = Math.hypot(endX - origin.x, endY - origin.y);
-  if (moved < 0.5) {
+  if (traveled < 0.5) {
     ui.notifications.warn(
       game.i18n.format("FOUNDRY-WAR.move.blocked", { name: doc.name }),
     );
