@@ -23,15 +23,14 @@ const DIRECTIONS = [
   { key: 8, icon: "fa-solid fa-arrow-up-left", dx: -1, dy: -1, label: "↖" },
 ];
 
-const DISTANCES = [0, 5, 10, 15, 20, 30, 40, 60, 90, 120];
+// La distanza non si imposta a mano: si legge dalla scheda (walking speed).
 
 const RayClass = globalThis.Ray ?? globalThis.foundry?.canvas?.geometry?.Ray;
 
 function getMoveData(doc) {
   const raw = doc.getFlag(MODULE_ID, FLAG) ?? {};
   const dir = Math.max(0, Math.min(8, Number(raw.dir ?? 0)));
-  const distance = Math.max(0, Number(raw.distance ?? 0));
-  return { dir, distance };
+  return { dir };
 }
 
 async function setMoveData(doc, data) {
@@ -109,16 +108,44 @@ function pixelsPerFoot() {
   return gridSize / gridDistance;
 }
 
+/**
+ * Legge la walking speed dalla scheda dell'attore.
+ * Supporta dnd5e (attributes.movement.walk), vecchie schede (attributes.speed.value)
+ * e Pathfinder 2e (attributes.speed.total). Fallback: 30 ft.
+ */
+function getWalkSpeed(doc) {
+  const actor = doc?.actor;
+  if (!actor) return 30;
+
+  const system = actor.system ?? {};
+  const raw =
+    system.attributes?.movement?.walk ??
+    system.attributes?.movement?.speed ??
+    system.attributes?.speed?.walk ??
+    system.attributes?.speed?.value ??
+    system.attributes?.speed?.total ??
+    system.speed?.walk ??
+    system.speed?.value ??
+    null;
+
+  if (raw === null || raw === undefined) return 30;
+  if (typeof raw === "number") return Math.max(0, raw);
+
+  const match = String(raw).match(/-?\d+(?:[.,]\d+)?/);
+  return match ? Math.max(0, Number(match[0].replace(",", "."))) : 30;
+}
+
 async function moveToken(token) {
   const doc = token?.document;
   if (!doc) return false;
 
   const data = getMoveData(doc);
-  if (data.dir === 0 || data.distance <= 0) return false;
+  const distance = getWalkSpeed(doc);
+  if (data.dir === 0 || distance <= 0) return false;
 
   const direction = directionInfo(data.dir);
   const len = Math.hypot(direction.dx, direction.dy) || 1;
-  const pixels = data.distance * pixelsPerFoot();
+  const pixels = distance * pixelsPerFoot();
   let dx = (direction.dx / len) * pixels;
   let dy = (direction.dy / len) * pixels;
 
@@ -162,7 +189,7 @@ async function moveAllTokens() {
   const tokens = canvas.tokens?.placeables ?? [];
   const targets = tokens.filter((token) => {
     const data = getMoveData(token.document);
-    return data.dir > 0 && data.distance > 0;
+    return data.dir > 0 && getWalkSpeed(token.document) > 0;
   });
 
   if (!targets.length) {
@@ -203,16 +230,17 @@ Hooks.on("renderTokenHUD", (hud, html) => {
   const refresh = () => {
     const data = getMoveData(doc);
     const info = directionInfo(data.dir);
+    const speed = getWalkSpeed(doc);
 
     dirButton.innerHTML = `<i class="${info.icon}"></i>`;
     dirButton.dataset.tooltip = `${game.i18n.localize(
       "FOUNDRY-WAR.move.direction",
     )}: ${info.label}`;
 
-    distButton.innerHTML = `<i class="fa-solid fa-shoe-prints"></i><span class="fw-move-dist-label">${data.distance}</span>`;
+    distButton.innerHTML = `<i class="fa-solid fa-shoe-prints"></i><span class="fw-move-dist-label">${speed}</span>`;
     distButton.dataset.tooltip = `${game.i18n.localize(
       "FOUNDRY-WAR.move.distance",
-    )}: ${data.distance} ft`;
+    )}: ${speed} ft`;
   };
 
   dirButton.addEventListener("click", async (event) => {
@@ -226,16 +254,10 @@ Hooks.on("renderTokenHUD", (hud, html) => {
     refresh();
   });
 
-  distButton.addEventListener("click", async (event) => {
+  distButton.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const data = getMoveData(doc);
-    const index = DISTANCES.indexOf(data.distance);
-    const next =
-      index === -1
-        ? DISTANCES.find((value) => value > data.distance) ?? 0
-        : DISTANCES[(index + 1) % DISTANCES.length] ?? 0;
-    await setMoveData(doc, { ...data, distance: next });
+    // La velocità è quella della scheda: il click la rilegge.
     refresh();
   });
 
@@ -288,7 +310,7 @@ function ensureMapArrow(token) {
 
   const data = getMoveData(token.document);
   arrow.text = ARROW_GLYPHS[data.dir] ?? "";
-  arrow.visible = game.user.isGM && data.dir > 0;
+  arrow.visible = data.dir > 0;
   arrow.position.set(token.w / 2, -6);
 
   if (token.sortableChildren) arrow.zIndex = 9999;
