@@ -144,39 +144,76 @@ async function moveToken(token) {
   if (data.dir === 0 || distance <= 0) return false;
 
   const direction = directionInfo(data.dir);
-  const len = Math.hypot(direction.dx, direction.dy) || 1;
-  const pixels = distance * pixelsPerFoot();
-  let dx = (direction.dx / len) * pixels;
-  let dy = (direction.dy / len) * pixels;
+  const length = Math.hypot(direction.dx, direction.dy) || 1;
+  const ux = direction.dx / length;
+  const uy = direction.dy / length;
+  const total = distance * pixelsPerFoot();
 
   const origin = token.center.clone();
-  const free = (mx, my) => {
-    const target = new PIXI.Point(origin.x + mx, origin.y + my);
-    return !wallBlocks(origin, target);
+  const freeFrom = (from, mx, my) => {
+    const target = new PIXI.Point(from.x + mx, from.y + my);
+    return !wallBlocks(from, target);
   };
+  const free = (mx, my) => freeFrom(origin, mx, my);
 
-  if (!free(dx, dy)) {
-    if (free(dx, 0)) {
-      dy = -dy;
-    } else if (free(0, dy)) {
-      dx = -dx;
-    } else {
-      dx = -dx;
-      dy = -dy;
+  let endX = origin.x;
+  let endY = origin.y;
+  let newDir = data.dir;
+
+  if (free(ux * total, uy * total)) {
+    endX += ux * total;
+    endY += uy * total;
+  } else {
+    // Trova il punto massimo raggiungibile prima del muro.
+    let lo = 0;
+    let hi = total;
+    for (let i = 0; i < 14; i += 1) {
+      const mid = (lo + hi) / 2;
+      if (free(ux * mid, uy * mid)) lo = mid;
+      else hi = mid;
     }
-    if (!free(dx, dy)) {
-      ui.notifications.warn(
-        game.i18n.format("FOUNDRY-WAR.move.blocked", { name: doc.name }),
-      );
-      return false;
+
+    const forward = lo;
+    const impactX = origin.x + ux * forward;
+    const impactY = origin.y + uy * forward;
+    const remaining = total - forward;
+
+    endX = impactX;
+    endY = impactY;
+    newDir = closestDirection(-ux, -uy);
+
+    if (remaining > 0.5) {
+      let back = remaining;
+      if (!freeFrom({ x: impactX, y: impactY }, -ux * back, -uy * back)) {
+        let loBack = 0;
+        let hiBack = back;
+        for (let i = 0; i < 14; i += 1) {
+          const mid = (loBack + hiBack) / 2;
+          if (freeFrom({ x: impactX, y: impactY }, -ux * mid, -uy * mid)) {
+            loBack = mid;
+          } else {
+            hiBack = mid;
+          }
+        }
+        back = loBack;
+      }
+      endX += -ux * back;
+      endY += -uy * back;
     }
   }
 
-  const newX = Math.round(origin.x + dx - token.w / 2);
-  const newY = Math.round(origin.y + dy - token.h / 2);
+  const moved = Math.hypot(endX - origin.x, endY - origin.y);
+  if (moved < 0.5) {
+    ui.notifications.warn(
+      game.i18n.format("FOUNDRY-WAR.move.blocked", { name: doc.name }),
+    );
+    return false;
+  }
+
+  const newX = Math.round(endX - token.w / 2);
+  const newY = Math.round(endY - token.h / 2);
   await doc.update({ x: newX, y: newY }, { animate: true });
 
-  const newDir = closestDirection(dx, dy);
   if (newDir !== data.dir) {
     await setMoveData(doc, { ...data, dir: newDir });
   }
@@ -224,9 +261,6 @@ Hooks.on("renderTokenHUD", (hud, html) => {
   const dirButton = document.createElement("div");
   dirButton.className = "control-icon fw-move-dir";
 
-  const distButton = document.createElement("div");
-  distButton.className = "control-icon fw-move-dist";
-
   const refresh = () => {
     const data = getMoveData(doc);
     const info = directionInfo(data.dir);
@@ -235,12 +269,7 @@ Hooks.on("renderTokenHUD", (hud, html) => {
     dirButton.innerHTML = `<i class="${info.icon}"></i>`;
     dirButton.dataset.tooltip = `${game.i18n.localize(
       "FOUNDRY-WAR.move.direction",
-    )}: ${info.label}`;
-
-    distButton.innerHTML = `<i class="fa-solid fa-shoe-prints"></i><span class="fw-move-dist-label">${speed}</span>`;
-    distButton.dataset.tooltip = `${game.i18n.localize(
-      "FOUNDRY-WAR.move.distance",
-    )}: ${speed} ft`;
+    )}: ${info.label} (${speed} ft)`;
   };
 
   dirButton.addEventListener("click", async (event) => {
@@ -254,15 +283,8 @@ Hooks.on("renderTokenHUD", (hud, html) => {
     refresh();
   });
 
-  distButton.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    // La velocità è quella della scheda: il click la rilegge.
-    refresh();
-  });
-
   refresh();
-  column.append(dirButton, distButton);
+  column.append(dirButton);
 });
 
 /* -------------------------------------------------------------------------- */
