@@ -18,9 +18,27 @@ function isFormula(change) {
   return typeof change.value === "string" && change.value.includes("@item.");
 }
 
+function itemRollData(item) {
+  const data = item.getRollData?.() ?? {};
+  const uses = data.item?.uses ?? item.system?.uses;
+
+  // dnd5e 5.x salva `spent` e calcola `value` solo in prepareFinalData:
+  // lo ricostruiamo per essere sicuri di averlo a disposizione.
+  if (uses) {
+    if (!Number.isFinite(Number(uses.value))) {
+      const max = Number(uses.max) || 0;
+      const spent = Number(uses.spent) || 0;
+      uses.value = Math.max(0, max - spent);
+    }
+    if (data.item?.uses) data.item.uses.value = uses.value;
+  }
+
+  return data;
+}
+
 function resolveFormula(formula, item) {
   try {
-    const rollData = item.getRollData?.() ?? {};
+    const rollData = itemRollData(item);
     const replaced = Roll.replaceFormulaData(formula, rollData, {
       missing: "0",
     });
