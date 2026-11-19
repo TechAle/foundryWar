@@ -24,12 +24,7 @@
       "none": "Nessun token con direzione e movimento.",
       "done": "Token mossi: {count}.",
       "blocked": "{name} è bloccato da un muro.",
-      "ballOff": "Palla: clic per aggiungere la vita (shift-clic per toglierla).",
-      "ballHp": "Palla: {hp}/{max} rimbalzi. Clic per resettare, shift-clic per disattivare.",
-      "ballDead": "{name}: palla a 0 vita, non si muove più.",
-      "ballDeadTooltip": "Palla a 0 vita. Clic per resettare, shift-clic per disattivare.",
-      "ballReset": "{name}: palla ricaricata a {hp} rimbalzi.",
-      "ballRemoved": "{name}: modalità palla disattivata."
+      "ballDead": "{name}: vita a 0, non si muove più."
     },
     "settings": {
       "enabled": {
@@ -57,8 +52,8 @@
         "hint": "Il margine del vincitore deve raggiungere questa percentuale delle sue truppe iniziali. 80% = consigliato."
       },
       "ballCharges": {
-        "name": "Vita della palla (rimbalzi)",
-        "hint": "Quanti rimbalzi sui muri sopporta un token palla prima di mostrare la X. Predefinito 6."
+        "name": "Vita di riserva (rimbalzi)",
+        "hint": "Usata solo per i token la cui scheda non ha HP: quanti rimbalzi prima della X. Predefinito 6."
       }
     },
     "dialog": {

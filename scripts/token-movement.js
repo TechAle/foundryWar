@@ -4,8 +4,9 @@
  * - Due icone nel Token HUD: direzione (ciclica) e movimento in ft (ciclico).
  * - Un bottone nei Tile Controls muove tutti i token con una direzione.
  * - Se il percorso incontra un muro, il token rimbalza.
- * - Modalità "palla": ogni rimbalzo costa 1 punto vita; a 0 la freccia
- *   diventa una X e la palla non si muove più.
+ * - Ogni rimbalzo costa 1 punto vita: usa gli HP della scheda se ci sono,
+ *   altrimenti un contatore interno. A 0 la freccia diventa una X e il
+ *   token non si muove più. Non c'è nulla da attivare: vale per tutti.
  *
  * I dati sono salvati nel flag `flags["foundry-war"].move = { dir, hp?, maxHp? }`.
  */
@@ -53,14 +54,65 @@ async function setMoveData(doc, data) {
   await doc.setFlag(MODULE_ID, FLAG, clean);
 }
 
-/** Un token è una "palla" se ha un contatore di rimbalzi (hp). */
-function isBall(data) {
-  return data.hp !== null;
+function toNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+/** HP dell'attore, se la scheda ne espone una (dnd5e e simili). */
+function getActorHp(doc) {
+  const system = doc?.actor?.system ?? {};
+  const hp = system.attributes?.hp ?? system.hp ?? system.health;
+  if (!hp) return null;
+
+  const value = toNumber(hp.value ?? hp.current);
+  if (value === null) return null;
+
+  const max = toNumber(hp.max ?? hp.maximum);
+  return { value, max: max ?? value };
+}
+
+async function setActorHp(doc, value) {
+  const system = doc?.actor?.system ?? {};
+  const rounded = Math.max(0, Math.floor(value));
+
+  if (system.attributes?.hp?.value != null) {
+    await doc.actor.update({ "system.attributes.hp.value": rounded });
+    return true;
+  }
+  if (system.hp?.value != null) {
+    await doc.actor.update({ "system.hp.value": rounded });
+    return true;
+  }
+  if (system.health?.value != null) {
+    await doc.actor.update({ "system.health.value": rounded });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Vita della palla, sempre attiva.
+ * - Se la scheda ha gli HP, usa quelli (il rimbalzo toglie 1 PF veri).
+ * - Altrimenti usa un contatore interno che parte dal default delle impostazioni.
+ */
+function getTokenHp(doc) {
+  const actorHp = getActorHp(doc);
+  if (actorHp) return { ...actorHp, source: "actor" };
+
+  const data = getMoveData(doc);
+  if (data.hp !== null) {
+    return { value: data.hp, max: data.maxHp ?? data.hp, source: "flag" };
+  }
+
+  const max = defaultBallCharges();
+  return { value: max, max, source: "flag" };
 }
 
 /** Palla a secco: non si muove più e mostra la X. */
-function isBallDead(data) {
-  return isBall(data) && data.hp <= 0;
+function isTokenDead(doc) {
+  const hp = getTokenHp(doc);
+  return hp.value <= 0;
 }
 
 function defaultBallCharges() {
@@ -72,9 +124,8 @@ function defaultBallCharges() {
 }
 
 /**
- * Attiva, resetta o disattiva la modalità palla.
- * @param {TokenDocument} doc
- * @param {number|null} hp  null = disattiva
+ * Reset manuale via macro. Con hp null azzera il contatore interno.
+ * Nota: se la scheda ha gli HP, il reset va fatto curando l'attore.
  */
 async function setBall(doc, hp = null) {
   const data = getMoveData(doc);
@@ -191,7 +242,7 @@ async function moveToken(token) {
   const data = getMoveData(doc);
   const distance = getWalkSpeed(doc);
   if (data.dir === 0 || distance <= 0) return false;
-  if (isBallDead(data)) return false;
+  if (isTokenDead(doc)) return false;
 
   const direction = directionInfo(data.dir);
   const length = Math.hypot(direction.dx, direction.dy) || 1;
@@ -271,11 +322,13 @@ async function moveToken(token) {
     return false;
   }
 
-  // Palla: ogni urto contro il muro costa 1 vita. A 0 si ferma sull'impatto.
-  let hp = data.hp;
-  if (bounced && isBall(data)) {
-    hp = Math.max(0, data.hp - 1);
-    if (hp <= 0 && impactX !== null && impactY !== null) {
+  // Ogni urto contro il muro costa 1 vita. A 0 si ferma sull'impatto.
+  const hpBefore = getTokenHp(doc);
+  let hpAfter = hpBefore.value;
+
+  if (bounced) {
+    hpAfter = Math.max(0, hpBefore.value - 1);
+    if (hpAfter <= 0 && impactX !== null && impactY !== null) {
       endX = impactX;
       endY = impactY;
     }
@@ -286,13 +339,20 @@ async function moveToken(token) {
   await doc.update({ x: newX, y: newY }, { animate: true });
 
   const next = { ...data, dir: newDir };
-  if (isBall(data)) next.hp = hp;
+  if (hpBefore.source === "flag" && bounced) {
+    next.hp = hpAfter;
+    next.maxHp = hpBefore.max;
+  }
 
   if (next.dir !== data.dir || next.hp !== data.hp) {
     await setMoveData(doc, next);
   }
 
-  if (hp !== null && hp !== undefined && hp <= 0 && data.hp > 0) {
+  if (bounced && hpBefore.source === "actor") {
+    await setActorHp(doc, hpAfter);
+  }
+
+  if (bounced && hpAfter <= 0 && hpBefore.value > 0) {
     ui.notifications.info(
       game.i18n.format("FOUNDRY-WAR.move.ballDead", { name: doc.name }),
     );
@@ -307,7 +367,11 @@ async function moveAllTokens() {
   const tokens = canvas.tokens?.placeables ?? [];
   const targets = tokens.filter((token) => {
     const data = getMoveData(token.document);
-    return data.dir > 0 && getWalkSpeed(token.document) > 0 && !isBallDead(data);
+    return (
+      data.dir > 0 &&
+      getWalkSpeed(token.document) > 0 &&
+      !isTokenDead(token.document)
+    );
   });
 
   if (!targets.length) {
@@ -362,70 +426,10 @@ Hooks.on("renderTokenHUD", (hud, html) => {
       dir: (data.dir + 1) % DIRECTIONS.length,
     });
     refresh();
-    refreshBall();
   });
 
   refresh();
   column.append(dirButton);
-
-  /* --- Palla: attiva / resetta i rimbalzi, shift-click per disattivare --- */
-  const ballButton = document.createElement("div");
-  ballButton.className = "control-icon fw-move-ball";
-
-  const refreshBall = () => {
-    const data = getMoveData(doc);
-
-    if (!isBall(data)) {
-      ballButton.innerHTML = `<i class="fa-solid fa-circle"></i>`;
-      ballButton.dataset.tooltip = game.i18n.localize(
-        "FOUNDRY-WAR.move.ballOff",
-      );
-      return;
-    }
-
-    if (isBallDead(data)) {
-      ballButton.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
-      ballButton.dataset.tooltip = game.i18n.format(
-        "FOUNDRY-WAR.move.ballDeadTooltip",
-        { name: doc.name },
-      );
-      return;
-    }
-
-    ballButton.innerHTML = `<i class="fa-solid fa-circle"></i>`;
-    ballButton.dataset.tooltip = game.i18n.format(
-      "FOUNDRY-WAR.move.ballHp",
-      { hp: data.hp, max: data.maxHp ?? data.hp },
-    );
-  };
-
-  ballButton.addEventListener("click", async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const data = getMoveData(doc);
-
-    if (event.shiftKey) {
-      await setBall(doc, null);
-      ui.notifications.info(
-        game.i18n.format("FOUNDRY-WAR.move.ballRemoved", { name: doc.name }),
-      );
-    } else {
-      const max = data.maxHp ?? defaultBallCharges();
-      await setBall(doc, max);
-      ui.notifications.info(
-        game.i18n.format("FOUNDRY-WAR.move.ballReset", {
-          name: doc.name,
-          hp: max,
-        }),
-      );
-    }
-
-    refreshBall();
-  });
-
-  refreshBall();
-  column.append(ballButton);
 });
 
 /* -------------------------------------------------------------------------- */
@@ -472,7 +476,7 @@ function ensureMapArrow(token) {
   }
 
   const data = getMoveData(token.document);
-  const dead = isBallDead(data);
+  const dead = isTokenDead(token.document);
 
   arrow.text = dead ? "✕" : ARROW_GLYPHS[data.dir] ?? "";
   arrow.visible = dead || data.dir > 0;
@@ -491,6 +495,13 @@ Hooks.on("updateToken", (doc, changes) => {
   if (token) ensureMapArrow(token);
 });
 
+// Gli HP dell'attore cambiano (rimbalzo, cura, danno): rinfresca la X.
+Hooks.on("updateActor", (actor) => {
+  for (const token of canvas.tokens?.placeables ?? []) {
+    if (token.actor === actor) ensureMapArrow(token);
+  }
+});
+
 Hooks.on("canvasReady", () => {
   for (const token of canvas.tokens?.placeables ?? []) ensureMapArrow(token);
 });
@@ -504,11 +515,18 @@ Hooks.once("ready", () => {
   game.foundryWar.setTokenMoveData = (tokenOrDoc, data) =>
     setMoveData(tokenOrDoc?.document ?? tokenOrDoc, data);
 
-  // Palla: game.foundryWar.setBall(token, 6) / setBall(token, null) per disattivare.
+  // Reset manuale: game.foundryWar.setBall(token, 6). Con HP da scheda, cura l'attore.
   game.foundryWar.setBall = (tokenOrDoc, hp = null) =>
     setBall(tokenOrDoc?.document ?? tokenOrDoc, hp);
   game.foundryWar.getBall = (tokenOrDoc) => {
-    const data = getMoveData(tokenOrDoc?.document ?? tokenOrDoc);
-    return { ...data, isBall: isBall(data), dead: isBallDead(data) };
+    const doc = tokenOrDoc?.document ?? tokenOrDoc;
+    const hp = getTokenHp(doc);
+    return {
+      ...getMoveData(doc),
+      hp: hp.value,
+      max: hp.max,
+      source: hp.source,
+      dead: hp.value <= 0,
+    };
   };
 });

@@ -24,12 +24,7 @@
       "none": "No tokens with direction and movement.",
       "done": "Tokens moved: {count}.",
       "blocked": "{name} is blocked by a wall.",
-      "ballOff": "Ball: click to add bounce HP (shift-click when active to remove).",
-      "ballHp": "Ball: {hp}/{max} bounces left. Click to reset, shift-click to remove.",
-      "ballDead": "{name}: ball out of HP, it no longer moves.",
-      "ballDeadTooltip": "Ball out of HP. Click to reset, shift-click to remove.",
-      "ballReset": "{name}: ball reset to {hp} bounces.",
-      "ballRemoved": "{name}: ball mode removed."
+      "ballDead": "{name}: life at 0, it no longer moves."
     },
     "settings": {
       "enabled": {
@@ -57,8 +52,8 @@
         "hint": "The winner's margin must reach this percentage of their initial troops. 80% = recommended."
       },
       "ballCharges": {
-        "name": "Ball HP (bounces)",
-        "hint": "How many wall bounces a ball token survives before showing the X. Default 6."
+        "name": "Fallback life (bounces)",
+        "hint": "Only for tokens whose sheet has no HP: how many bounces before the X. Default 6."
       }
     },
     "dialog": {
