@@ -24,6 +24,7 @@ import {
 import { getGroups, openGroupManager } from "./war-groups.js";
 import { refreshEconomyPanel, toggleEconomyPanel } from "./economy.js";
 import "./token-movement.js";
+import "./item-uses-effects.js";
 
 const MODULE_ID = "foundry-war";
 const STATE_KEY = "warState";
