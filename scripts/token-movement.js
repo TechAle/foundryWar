@@ -416,10 +416,12 @@ function ensureMapArrow(token) {
   }
 
   const data = getMoveData(token.document);
-  const dead = isTokenDead(token.document);
+  const hasArrow = data.dir > 0;
+  // La X riguarda solo i token che hanno una direzione attiva.
+  const dead = hasArrow && isTokenDead(token.document);
 
   arrow.text = dead ? "✕" : ARROW_GLYPHS[data.dir] ?? "";
-  arrow.visible = dead || data.dir > 0;
+  arrow.visible = hasArrow;
   arrow.style.fill = dead ? 0xd23c3c : 0xffd54a;
   arrow.style.fontSize = dead ? 42 : 30;
   arrow.position.set(token.w / 2, -6);
