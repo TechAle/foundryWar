@@ -114,7 +114,7 @@ Hooks.once("ready", () => {
   console.log(`${MODULE_ID} | ready`);
 
   // API per macro.
-  game.foundryWar = {
+  game.foundryWar = Object.assign(game.foundryWar ?? {}, {
     version: game.modules.get(MODULE_ID)?.version ?? "dev",
     ping: () => ui.notifications.info(game.i18n.localize("FOUNDRY-WAR.notifications.pong")),
     openConfig: openWarConfig,
@@ -127,7 +127,7 @@ Hooks.once("ready", () => {
     openGroupManager,
     getGroups,
     openEconomy: toggleEconomyPanel,
-  };
+  });
 
   // I client senza permessi di modifica delegano le scritture al GM.
   game.socket.on(`module.${MODULE_ID}`, (payload) => {

@@ -18,22 +18,35 @@ function isFormula(change) {
   return typeof change.value === "string" && change.value.includes("@item.");
 }
 
+/**
+ * Roll data dell'oggetto con `item.uses` sempre completo.
+ * dnd5e 5.x salva `spent` e calcola `value` solo alla fine della preparazione.
+ */
 function itemRollData(item) {
-  const data = item.getRollData?.() ?? {};
-  const uses = data.item?.uses ?? item.system?.uses;
+  const base = item.getRollData?.() ?? {};
+  const system = item.system ?? {};
+  const uses = { ...(system.uses ?? {}) };
 
-  // dnd5e 5.x salva `spent` e calcola `value` solo in prepareFinalData:
-  // lo ricostruiamo per essere sicuri di averlo a disposizione.
-  if (uses) {
-    if (!Number.isFinite(Number(uses.value))) {
-      const max = Number(uses.max) || 0;
-      const spent = Number(uses.spent) || 0;
-      uses.value = Math.max(0, max - spent);
-    }
-    if (data.item?.uses) data.item.uses.value = uses.value;
-  }
+  const max = Number(uses.max);
+  const spent = Number(uses.spent);
+  const value = Number(uses.value);
 
-  return data;
+  uses.max = Number.isFinite(max) ? max : 0;
+  uses.spent = Number.isFinite(spent) ? spent : 0;
+  uses.value = Number.isFinite(value)
+    ? value
+    : Math.max(0, uses.max - uses.spent);
+
+  return {
+    ...base,
+    item: {
+      ...(base.item ?? {}),
+      ...system,
+      uses,
+      name: item.name,
+      _id: item.id,
+    },
+  };
 }
 
 function resolveFormula(formula, item) {
@@ -66,7 +79,7 @@ async function syncItem(item) {
     for (const change of changes) {
       const id = change._id ?? change.key;
 
-      // Adotta la formula se il change ne contiene una (prima volta o dopo una modifica).
+      // Adotta la formula se il change ne contiene una (prima volta o modifica).
       if (isFormula(change) && change.value !== next[id]) {
         next[id] = change.value;
         dirty = true;
@@ -76,7 +89,9 @@ async function syncItem(item) {
       if (!formula) continue;
 
       const value = resolveFormula(formula, item);
-      if (value !== null && change.value !== value) {
+      if (value === null) continue;
+
+      if (change.value !== value) {
         change.value = value;
         dirty = true;
       }
@@ -84,13 +99,17 @@ async function syncItem(item) {
 
     if (!dirty) continue;
 
-    await effect.update(
-      {
-        changes,
-        [`flags.${MODULE_ID}.${FLAG}`]: next,
-      },
-      { render: false },
-    );
+    try {
+      await effect.update(
+        {
+          changes,
+          [`flags.${MODULE_ID}.${FLAG}`]: next,
+        },
+        { render: false },
+      );
+    } catch (error) {
+      console.warn(`${MODULE_ID} | impossibile aggiornare l'effetto ${effect.name}`, error);
+    }
   }
 }
 
@@ -105,6 +124,35 @@ function syncAll() {
   for (const token of canvas.tokens?.placeables ?? []) {
     for (const item of token.actor?.items ?? []) syncItem(item);
   }
+}
+
+/** Report leggibile per capire cosa vede il modulo. */
+function debugItem(item) {
+  const report = {
+    version: game.modules.get(MODULE_ID)?.version,
+    isGM: game.user.isGM,
+    item: item?.name ?? null,
+    uses: item?.system?.uses ? { ...item.system.uses } : null,
+    itemsUses: itemRollData(item).item?.uses ?? null,
+    effects: [],
+  };
+
+  for (const effect of item?.effects ?? []) {
+    report.effects.push({
+      name: effect.name,
+      disabled: effect.disabled,
+      changes: (effect.changes ?? []).map((change) => ({
+        _id: change._id,
+        key: change.key,
+        type: change.type,
+        value: change.value,
+      })),
+      stored: effect.getFlag(MODULE_ID, FLAG) ?? null,
+    });
+  }
+
+  console.log(`${MODULE_ID} | debug`, report);
+  return report;
 }
 
 Hooks.once("ready", syncAll);
@@ -122,11 +170,12 @@ Hooks.on("updateActiveEffect", (effect) => {
 
 Hooks.once("ready", () => {
   game.foundryWar ??= {};
-  game.foundryWar.syncItemUses = (itemOrActor) => {
-    if (itemOrActor?.items) {
-      for (const item of itemOrActor.items) syncItem(item);
+  game.foundryWar.syncItemUses = (target) => {
+    if (target?.items) {
+      for (const item of target.items) syncItem(item);
       return;
     }
-    if (itemOrActor) syncItem(itemOrActor);
+    if (target) syncItem(target);
   };
+  game.foundryWar.debugItemUses = debugItem;
 });
