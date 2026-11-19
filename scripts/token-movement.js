@@ -402,11 +402,11 @@ function ensureMapArrow(token) {
   if (!arrow) {
     arrow = new PIXI.Text("", {
       fontFamily: "Arial, Helvetica, sans-serif",
-      fontSize: 30,
+      fontSize: 15,
       fontWeight: "bold",
       fill: 0xffd54a,
       stroke: 0x1a1a1a,
-      strokeThickness: 5,
+      strokeThickness: 3,
       align: "center",
     });
     arrow.name = "fw-move-arrow";
@@ -423,7 +423,7 @@ function ensureMapArrow(token) {
   arrow.text = dead ? "✕" : ARROW_GLYPHS[data.dir] ?? "";
   arrow.visible = hasArrow;
   arrow.style.fill = dead ? 0xd23c3c : 0xffd54a;
-  arrow.style.fontSize = dead ? 42 : 30;
+  arrow.style.fontSize = dead ? 21 : 15;
   arrow.position.set(token.w / 2, -6);
 
   if (token.sortableChildren) arrow.zIndex = 9999;
