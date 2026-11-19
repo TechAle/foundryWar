@@ -50,10 +50,6 @@
       "battleTotalThreshold": {
         "name": "Soglia vittoria totale",
         "hint": "Il margine del vincitore deve raggiungere questa percentuale delle sue truppe iniziali. 80% = consigliato."
-      },
-      "ballCharges": {
-        "name": "Vita di riserva (rimbalzi)",
-        "hint": "Usata solo per i token la cui scheda non ha HP: quanti rimbalzi prima della X. Predefinito 6."
       }
     },
     "dialog": {

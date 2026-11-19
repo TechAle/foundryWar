@@ -4,11 +4,11 @@
  * - Due icone nel Token HUD: direzione (ciclica) e movimento in ft (ciclico).
  * - Un bottone nei Tile Controls muove tutti i token con una direzione.
  * - Se il percorso incontra un muro, il token rimbalza.
- * - Ogni rimbalzo costa 1 punto vita: usa gli HP della scheda se ci sono,
- *   altrimenti un contatore interno. A 0 la freccia diventa una X e il
- *   token non si muove più. Non c'è nulla da attivare: vale per tutti.
+ * - Ogni rimbalzo costa 1 PF vero, preso dalla scheda. A 0 la freccia
+ *   diventa una X e il token non si muove più. Non c'è nulla da attivare.
+ * - I token senza HP sulla scheda non perdono vita (e non mostrano la X).
  *
- * I dati sono salvati nel flag `flags["foundry-war"].move = { dir, hp?, maxHp? }`.
+ * I dati sono salvati nel flag `flags["foundry-war"].move = { dir }`.
  */
 
 const MODULE_ID = "foundry-war";
@@ -33,25 +33,11 @@ const RayClass = globalThis.Ray ?? globalThis.foundry?.canvas?.geometry?.Ray;
 function getMoveData(doc) {
   const raw = doc.getFlag(MODULE_ID, FLAG) ?? {};
   const dir = Math.max(0, Math.min(8, Number(raw.dir ?? 0)));
-
-  // hp assente = token normale (nessun conteggio rimbalzi).
-  const hp =
-    raw.hp === null || raw.hp === undefined
-      ? null
-      : Math.max(0, Math.floor(Number(raw.hp)));
-  const maxHp =
-    raw.maxHp === null || raw.maxHp === undefined
-      ? null
-      : Math.max(1, Math.floor(Number(raw.maxHp)));
-
-  return { dir, hp, maxHp };
+  return { dir };
 }
 
 async function setMoveData(doc, data) {
-  const clean = { dir: data.dir };
-  if (data.hp !== null && data.hp !== undefined) clean.hp = data.hp;
-  if (data.maxHp !== null && data.maxHp !== undefined) clean.maxHp = data.maxHp;
-  await doc.setFlag(MODULE_ID, FLAG, clean);
+  await doc.setFlag(MODULE_ID, FLAG, { dir: data.dir });
 }
 
 function toNumber(value) {
@@ -59,7 +45,7 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-/** HP dell'attore, se la scheda ne espone una (dnd5e e simili). */
+/** HP veri dell'attore, se la scheda ne espone una (dnd5e e simili). */
 function getActorHp(doc) {
   const system = doc?.actor?.system ?? {};
   const hp = system.attributes?.hp ?? system.hp ?? system.health;
@@ -91,50 +77,10 @@ async function setActorHp(doc, value) {
   return false;
 }
 
-/**
- * Vita della palla, sempre attiva.
- * - Se la scheda ha gli HP, usa quelli (il rimbalzo toglie 1 PF veri).
- * - Altrimenti usa un contatore interno che parte dal default delle impostazioni.
- */
-function getTokenHp(doc) {
-  const actorHp = getActorHp(doc);
-  if (actorHp) return { ...actorHp, source: "actor" };
-
-  const data = getMoveData(doc);
-  if (data.hp !== null) {
-    return { value: data.hp, max: data.maxHp ?? data.hp, source: "flag" };
-  }
-
-  const max = defaultBallCharges();
-  return { value: max, max, source: "flag" };
-}
-
-/** Palla a secco: non si muove più e mostra la X. */
+/** A 0 PF il token non si muove più e mostra la X. */
 function isTokenDead(doc) {
-  const hp = getTokenHp(doc);
-  return hp.value <= 0;
-}
-
-function defaultBallCharges() {
-  try {
-    return Math.max(1, Math.floor(Number(game.settings.get(MODULE_ID, "ballCharges")) || 6));
-  } catch (error) {
-    return 6;
-  }
-}
-
-/**
- * Reset manuale via macro. Con hp null azzera il contatore interno.
- * Nota: se la scheda ha gli HP, il reset va fatto curando l'attore.
- */
-async function setBall(doc, hp = null) {
-  const data = getMoveData(doc);
-  if (hp === null || hp === undefined) {
-    await setMoveData(doc, { dir: data.dir });
-    return;
-  }
-  const value = Math.max(0, Math.floor(Number(hp)));
-  await setMoveData(doc, { dir: data.dir, hp: value, maxHp: value });
+  const hp = getActorHp(doc);
+  return hp ? hp.value <= 0 : false;
 }
 
 function directionInfo(key) {
@@ -322,11 +268,11 @@ async function moveToken(token) {
     return false;
   }
 
-  // Ogni urto contro il muro costa 1 vita. A 0 si ferma sull'impatto.
-  const hpBefore = getTokenHp(doc);
-  let hpAfter = hpBefore.value;
+  // Ogni urto contro il muro costa 1 PF veri. A 0 si ferma sull'impatto.
+  const hpBefore = getActorHp(doc);
+  let hpAfter = hpBefore ? hpBefore.value : null;
 
-  if (bounced) {
+  if (bounced && hpBefore) {
     hpAfter = Math.max(0, hpBefore.value - 1);
     if (hpAfter <= 0 && impactX !== null && impactY !== null) {
       endX = impactX;
@@ -338,21 +284,15 @@ async function moveToken(token) {
   const newY = Math.round(endY - token.h / 2);
   await doc.update({ x: newX, y: newY }, { animate: true });
 
-  const next = { ...data, dir: newDir };
-  if (hpBefore.source === "flag" && bounced) {
-    next.hp = hpAfter;
-    next.maxHp = hpBefore.max;
+  if (newDir !== data.dir) {
+    await setMoveData(doc, { dir: newDir });
   }
 
-  if (next.dir !== data.dir || next.hp !== data.hp) {
-    await setMoveData(doc, next);
-  }
-
-  if (bounced && hpBefore.source === "actor") {
+  if (bounced && hpAfter !== null) {
     await setActorHp(doc, hpAfter);
   }
 
-  if (bounced && hpAfter <= 0 && hpBefore.value > 0) {
+  if (bounced && hpAfter === 0 && hpBefore.value > 0) {
     ui.notifications.info(
       game.i18n.format("FOUNDRY-WAR.move.ballDead", { name: doc.name }),
     );
@@ -515,18 +455,10 @@ Hooks.once("ready", () => {
   game.foundryWar.setTokenMoveData = (tokenOrDoc, data) =>
     setMoveData(tokenOrDoc?.document ?? tokenOrDoc, data);
 
-  // Reset manuale: game.foundryWar.setBall(token, 6). Con HP da scheda, cura l'attore.
-  game.foundryWar.setBall = (tokenOrDoc, hp = null) =>
-    setBall(tokenOrDoc?.document ?? tokenOrDoc, hp);
-  game.foundryWar.getBall = (tokenOrDoc) => {
+  // Lettura comoda: game.foundryWar.getTokenHp(token) -> { value, max, dead }
+  game.foundryWar.getTokenHp = (tokenOrDoc) => {
     const doc = tokenOrDoc?.document ?? tokenOrDoc;
-    const hp = getTokenHp(doc);
-    return {
-      ...getMoveData(doc),
-      hp: hp.value,
-      max: hp.max,
-      source: hp.source,
-      dead: hp.value <= 0,
-    };
+    const hp = getActorHp(doc);
+    return hp ? { ...hp, dead: hp.value <= 0 } : null;
   };
 });

@@ -50,10 +50,6 @@
       "battleTotalThreshold": {
         "name": "Total victory threshold",
         "hint": "The winner's margin must reach this percentage of their initial troops. 80% = recommended."
-      },
-      "ballCharges": {
-        "name": "Fallback life (bounces)",
-        "hint": "Only for tokens whose sheet has no HP: how many bounces before the X. Default 6."
       }
     },
     "dialog": {
