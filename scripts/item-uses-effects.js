@@ -37,16 +37,16 @@ function itemRollData(item) {
     ? value
     : Math.max(0, uses.max - uses.spent);
 
-  return {
-    ...base,
-    item: {
-      ...(base.item ?? {}),
-      ...system,
-      uses,
-      name: item.name,
-      _id: item.id,
-    },
+  const itemData = {
+    ...(base.item ?? {}),
+    ...system,
+    system, // alias: accetta anche @item.system.uses.value
+    uses,
+    name: item.name,
+    _id: item.id,
   };
+
+  return { ...base, item: itemData };
 }
 
 function resolveFormula(formula, item) {
