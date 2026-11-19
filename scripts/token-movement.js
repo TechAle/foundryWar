@@ -4,8 +4,10 @@
  * - Due icone nel Token HUD: direzione (ciclica) e movimento in ft (ciclico).
  * - Un bottone nei Tile Controls muove tutti i token con una direzione.
  * - Se il percorso incontra un muro, il token rimbalza.
+ * - Modalità "palla": ogni rimbalzo costa 1 punto vita; a 0 la freccia
+ *   diventa una X e la palla non si muove più.
  *
- * I dati sono salvati nel flag `flags["foundry-war"].move = { dir, distance }`.
+ * I dati sono salvati nel flag `flags["foundry-war"].move = { dir, hp?, maxHp? }`.
  */
 
 const MODULE_ID = "foundry-war";
@@ -30,11 +32,58 @@ const RayClass = globalThis.Ray ?? globalThis.foundry?.canvas?.geometry?.Ray;
 function getMoveData(doc) {
   const raw = doc.getFlag(MODULE_ID, FLAG) ?? {};
   const dir = Math.max(0, Math.min(8, Number(raw.dir ?? 0)));
-  return { dir };
+
+  // hp assente = token normale (nessun conteggio rimbalzi).
+  const hp =
+    raw.hp === null || raw.hp === undefined
+      ? null
+      : Math.max(0, Math.floor(Number(raw.hp)));
+  const maxHp =
+    raw.maxHp === null || raw.maxHp === undefined
+      ? null
+      : Math.max(1, Math.floor(Number(raw.maxHp)));
+
+  return { dir, hp, maxHp };
 }
 
 async function setMoveData(doc, data) {
-  await doc.setFlag(MODULE_ID, FLAG, data);
+  const clean = { dir: data.dir };
+  if (data.hp !== null && data.hp !== undefined) clean.hp = data.hp;
+  if (data.maxHp !== null && data.maxHp !== undefined) clean.maxHp = data.maxHp;
+  await doc.setFlag(MODULE_ID, FLAG, clean);
+}
+
+/** Un token è una "palla" se ha un contatore di rimbalzi (hp). */
+function isBall(data) {
+  return data.hp !== null;
+}
+
+/** Palla a secco: non si muove più e mostra la X. */
+function isBallDead(data) {
+  return isBall(data) && data.hp <= 0;
+}
+
+function defaultBallCharges() {
+  try {
+    return Math.max(1, Math.floor(Number(game.settings.get(MODULE_ID, "ballCharges")) || 6));
+  } catch (error) {
+    return 6;
+  }
+}
+
+/**
+ * Attiva, resetta o disattiva la modalità palla.
+ * @param {TokenDocument} doc
+ * @param {number|null} hp  null = disattiva
+ */
+async function setBall(doc, hp = null) {
+  const data = getMoveData(doc);
+  if (hp === null || hp === undefined) {
+    await setMoveData(doc, { dir: data.dir });
+    return;
+  }
+  const value = Math.max(0, Math.floor(Number(hp)));
+  await setMoveData(doc, { dir: data.dir, hp: value, maxHp: value });
 }
 
 function directionInfo(key) {
@@ -142,6 +191,7 @@ async function moveToken(token) {
   const data = getMoveData(doc);
   const distance = getWalkSpeed(doc);
   if (data.dir === 0 || distance <= 0) return false;
+  if (isBallDead(data)) return false;
 
   const direction = directionInfo(data.dir);
   const length = Math.hypot(direction.dx, direction.dy) || 1;
@@ -160,6 +210,9 @@ async function moveToken(token) {
   let endY = origin.y;
   let newDir = data.dir;
   let traveled = total;
+  let bounced = false;
+  let impactX = null;
+  let impactY = null;
 
   if (free(ux * total, uy * total)) {
     endX += ux * total;
@@ -185,6 +238,9 @@ async function moveToken(token) {
     endY = impact.y;
     newDir = closestDirection(-ux, -uy);
     traveled = forward;
+    bounced = true;
+    impactX = impact.x;
+    impactY = impact.y;
 
     // Il movimento che avanza dopo il muro viene percorso all'indietro.
     if (remaining > 0.5) {
@@ -215,13 +271,33 @@ async function moveToken(token) {
     return false;
   }
 
+  // Palla: ogni urto contro il muro costa 1 vita. A 0 si ferma sull'impatto.
+  let hp = data.hp;
+  if (bounced && isBall(data)) {
+    hp = Math.max(0, data.hp - 1);
+    if (hp <= 0 && impactX !== null && impactY !== null) {
+      endX = impactX;
+      endY = impactY;
+    }
+  }
+
   const newX = Math.round(endX - token.w / 2);
   const newY = Math.round(endY - token.h / 2);
   await doc.update({ x: newX, y: newY }, { animate: true });
 
-  if (newDir !== data.dir) {
-    await setMoveData(doc, { ...data, dir: newDir });
+  const next = { ...data, dir: newDir };
+  if (isBall(data)) next.hp = hp;
+
+  if (next.dir !== data.dir || next.hp !== data.hp) {
+    await setMoveData(doc, next);
   }
+
+  if (hp !== null && hp !== undefined && hp <= 0 && data.hp > 0) {
+    ui.notifications.info(
+      game.i18n.format("FOUNDRY-WAR.move.ballDead", { name: doc.name }),
+    );
+  }
+
   return true;
 }
 
@@ -231,7 +307,7 @@ async function moveAllTokens() {
   const tokens = canvas.tokens?.placeables ?? [];
   const targets = tokens.filter((token) => {
     const data = getMoveData(token.document);
-    return data.dir > 0 && getWalkSpeed(token.document) > 0;
+    return data.dir > 0 && getWalkSpeed(token.document) > 0 && !isBallDead(data);
   });
 
   if (!targets.length) {
@@ -250,7 +326,7 @@ async function moveAllTokens() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Token HUD: due icone                                                       */
+/* Token HUD: direzione, movimento, palla                                      */
 /* -------------------------------------------------------------------------- */
 Hooks.on("renderTokenHUD", (hud, html) => {
   if (!game.user.isGM) return;
@@ -286,10 +362,70 @@ Hooks.on("renderTokenHUD", (hud, html) => {
       dir: (data.dir + 1) % DIRECTIONS.length,
     });
     refresh();
+    refreshBall();
   });
 
   refresh();
   column.append(dirButton);
+
+  /* --- Palla: attiva / resetta i rimbalzi, shift-click per disattivare --- */
+  const ballButton = document.createElement("div");
+  ballButton.className = "control-icon fw-move-ball";
+
+  const refreshBall = () => {
+    const data = getMoveData(doc);
+
+    if (!isBall(data)) {
+      ballButton.innerHTML = `<i class="fa-solid fa-circle"></i>`;
+      ballButton.dataset.tooltip = game.i18n.localize(
+        "FOUNDRY-WAR.move.ballOff",
+      );
+      return;
+    }
+
+    if (isBallDead(data)) {
+      ballButton.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
+      ballButton.dataset.tooltip = game.i18n.format(
+        "FOUNDRY-WAR.move.ballDeadTooltip",
+        { name: doc.name },
+      );
+      return;
+    }
+
+    ballButton.innerHTML = `<i class="fa-solid fa-circle"></i>`;
+    ballButton.dataset.tooltip = game.i18n.format(
+      "FOUNDRY-WAR.move.ballHp",
+      { hp: data.hp, max: data.maxHp ?? data.hp },
+    );
+  };
+
+  ballButton.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const data = getMoveData(doc);
+
+    if (event.shiftKey) {
+      await setBall(doc, null);
+      ui.notifications.info(
+        game.i18n.format("FOUNDRY-WAR.move.ballRemoved", { name: doc.name }),
+      );
+    } else {
+      const max = data.maxHp ?? defaultBallCharges();
+      await setBall(doc, max);
+      ui.notifications.info(
+        game.i18n.format("FOUNDRY-WAR.move.ballReset", {
+          name: doc.name,
+          hp: max,
+        }),
+      );
+    }
+
+    refreshBall();
+  });
+
+  refreshBall();
+  column.append(ballButton);
 });
 
 /* -------------------------------------------------------------------------- */
@@ -336,8 +472,12 @@ function ensureMapArrow(token) {
   }
 
   const data = getMoveData(token.document);
-  arrow.text = ARROW_GLYPHS[data.dir] ?? "";
-  arrow.visible = data.dir > 0;
+  const dead = isBallDead(data);
+
+  arrow.text = dead ? "✕" : ARROW_GLYPHS[data.dir] ?? "";
+  arrow.visible = dead || data.dir > 0;
+  arrow.style.fill = dead ? 0xd23c3c : 0xffd54a;
+  arrow.style.fontSize = dead ? 42 : 30;
   arrow.position.set(token.w / 2, -6);
 
   if (token.sortableChildren) arrow.zIndex = 9999;
@@ -363,4 +503,12 @@ Hooks.once("ready", () => {
     getMoveData(tokenOrDoc?.document ?? tokenOrDoc);
   game.foundryWar.setTokenMoveData = (tokenOrDoc, data) =>
     setMoveData(tokenOrDoc?.document ?? tokenOrDoc, data);
+
+  // Palla: game.foundryWar.setBall(token, 6) / setBall(token, null) per disattivare.
+  game.foundryWar.setBall = (tokenOrDoc, hp = null) =>
+    setBall(tokenOrDoc?.document ?? tokenOrDoc, hp);
+  game.foundryWar.getBall = (tokenOrDoc) => {
+    const data = getMoveData(tokenOrDoc?.document ?? tokenOrDoc);
+    return { ...data, isBall: isBall(data), dead: isBallDead(data) };
+  };
 });

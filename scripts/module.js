@@ -97,6 +97,17 @@ Hooks.once("init", () => {
     range: { min: 0.5, max: 1, step: 0.01 },
   });
 
+  // Vita della "palla": quanti rimbalzi prima della X.
+  game.settings.register(MODULE_ID, "ballCharges", {
+    name: "FOUNDRY-WAR.settings.ballCharges.name",
+    hint: "FOUNDRY-WAR.settings.ballCharges.hint",
+    scope: "world",
+    config: true,
+    type: Number,
+    default: 6,
+    range: { min: 1, max: 12, step: 1 },
+  });
+
   // Stato del pannello: world setting = condivisa con tutti i client.
   game.settings.register(MODULE_ID, STATE_KEY, {
     scope: "world",
